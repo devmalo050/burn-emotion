@@ -1,5 +1,6 @@
-// 하늘과 땅 사이에 보이는 horizon 띠를 없애기 위해 — 단단한 wave-path 대신
-// 부드럽게 fade되는 그라데이션 한 장으로 깔아 시각적 seam 제거.
+// 사람들이 앉을 땅 — 가운데 어두운 면 + 모닥불 주변의 따뜻한 글로우.
+// horizon 띠 안 보이게 부드럽게 fade. 사람들 위치(약 75-90% 사이)에서 충분히 진해서
+// 떠있는 느낌 안 들도록.
 export function NightField() {
   return (
     <div
@@ -9,7 +10,7 @@ export function NightField() {
         pointerEvents: 'none',
         zIndex: 1,
         background:
-          'linear-gradient(180deg, transparent 0%, transparent 55%, rgba(15, 8, 4, 0.45) 80%, rgba(8, 4, 2, 0.85) 100%)',
+          'linear-gradient(180deg, transparent 0%, transparent 38%, rgba(15, 8, 4, 0.35) 62%, rgba(8, 5, 3, 0.78) 80%, rgba(4, 2, 1, 0.95) 100%)',
         userSelect: 'none',
       }}
     />

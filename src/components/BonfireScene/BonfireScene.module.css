@@ -121,7 +121,7 @@
 /* === Campfire zone === */
 .bonfireZone {
   position: absolute;
-  bottom: 160px;
+  bottom: 130px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 12;
@@ -301,7 +301,7 @@
 /* === Silhouettes around fire (sitting on the ground) === */
 .silhouettes {
   position: absolute;
-  bottom: 110px;
+  bottom: 70px;
   left: 50%;
   transform: translateX(-50%);
   width: 1100px;
@@ -391,7 +391,7 @@
 /* === Fire glow === */
 .fireGlow {
   position: absolute;
-  bottom: 270px;
+  bottom: 240px;
   left: 50%;
   transform: translateX(-50%);
   width: 480px;

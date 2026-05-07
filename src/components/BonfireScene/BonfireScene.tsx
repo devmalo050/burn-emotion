@@ -54,6 +54,7 @@ export function BonfireScene() {
   const [embers, setEmbers] = useState<EmberParticle[]>([]);
   const [shake, setShake] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [showPeople, setShowPeople] = useState(true);
   const [audioStarted, setAudioStarted] = useState(false);
   const [onlineCount, setOnlineCount] = useState(24);
   const [totalBurned, setTotalBurned] = useState(8421);
@@ -410,8 +411,8 @@ export function BonfireScene() {
         </div>
       )}
 
-      {/* Silhouettes */}
-      <div className={styles.silhouettes}>
+      {/* Silhouettes — 토글로 숨길 수 있음 */}
+      <div className={styles.silhouettes} style={{ opacity: showPeople ? 1 : 0, transition: 'opacity 0.4s ease' }}>
         {silhouettes.map((s, i) => (
           <div
             key={s.id}
@@ -538,6 +539,13 @@ export function BonfireScene() {
             onClick={() => setMuted((m) => !m)}
           >
             {muted ? '소리 꺼짐' : '소리 켜짐'}
+          </button>
+          <button
+            type="button"
+            className={styles.soundToggle}
+            onClick={() => setShowPeople((s) => !s)}
+          >
+            {showPeople ? '사람 보임' : '사람 숨김'}
           </button>
         </div>
       </div>
