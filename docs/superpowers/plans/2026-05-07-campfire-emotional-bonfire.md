@@ -943,7 +943,7 @@ git commit -m "feat(audio): port AudioEngine to TS singleton with SSR guard"
 **Files:**
 - Create: `src/components/Campfire/Campfire.tsx`
 
-- [ ] **Step 1: 컴포넌트 포팅**
+- [x] **Step 1: 컴포넌트 포팅**
 
 소스: `/tmp/design-extract/emotional-trash-can/project/svg-v2.jsx` 의 `Campfire` 컴포넌트 (line ~3-87).
 
@@ -1040,12 +1040,12 @@ export function Campfire({ width = 260, fireIntensity = 1 }: CampfireProps) {
 
 ⚠ 디자인 원본의 `filter="blur(0.5)"` 같은 inline filter 속성은 React에서는 string으로 바로 적용 가능하나 일부 브라우저에서 SVG에 적용 안 됨. 불필요해서 제거.
 
-- [ ] **Step 2: 빌드 확인**
+- [x] **Step 2: 빌드 확인**
 
 Run: `npm run build`
 Expected: 성공.
 
-- [ ] **Step 3: 커밋**
+- [x] **Step 3: 커밋**
 
 ```bash
 git add src/components/Campfire
@@ -1061,7 +1061,7 @@ git commit -m "feat(ui): port Campfire SVG component"
 
 소스: `/tmp/design-extract/emotional-trash-can/project/svg-v2.jsx` line ~88-369.
 
-- [ ] **Step 1: 컴포넌트 포팅**
+- [x] **Step 1: 컴포넌트 포팅**
 
 이 컴포넌트는 길지만 props만 타이핑해서 그대로 옮기면 된다. 핵심:
 - `seed` 기반으로 모양 결정 → `seededRandom(seed)` 사용
@@ -1349,12 +1349,12 @@ export function SweetPotato({
 
 ⚠ `filter` 속성에 `blur(0.4)` 같은 inline 필터는 모든 브라우저에서 SVG 안에 안전하지 않으므로 제거. 디자인 원본에 있던 `filter="blur(0.4)"` 만 빼고 동일.
 
-- [ ] **Step 2: 빌드 확인**
+- [x] **Step 2: 빌드 확인**
 
 Run: `npm run build`
 Expected: 성공.
 
-- [ ] **Step 3: 커밋**
+- [x] **Step 3: 커밋**
 
 ```bash
 git add src/components/SweetPotato
@@ -1368,7 +1368,7 @@ git commit -m "feat(ui): port SweetPotato SVG with seed-driven shape"
 **Files:**
 - Create: `src/components/PersonSilhouette/PersonSilhouette.tsx`
 
-- [ ] **Step 1: 컴포넌트 포팅**
+- [x] **Step 1: 컴포넌트 포팅**
 
 소스: `svg-v2.jsx` line ~371-419.
 
@@ -1434,12 +1434,12 @@ export function PersonSilhouette({ variant = 0, scale = 1 }: PersonSilhouettePro
 }
 ```
 
-- [ ] **Step 2: 빌드 확인**
+- [x] **Step 2: 빌드 확인**
 
 Run: `npm run build`
 Expected: 성공.
 
-- [ ] **Step 3: 커밋**
+- [x] **Step 3: 커밋**
 
 ```bash
 git add src/components/PersonSilhouette
@@ -1454,7 +1454,7 @@ git commit -m "feat(ui): port PersonSilhouette with 5 sitting variants"
 - Create: `src/components/StarrySky/StarrySky.tsx`
 - Create: `src/components/StarrySky/StarrySky.module.css`
 
-- [ ] **Step 1: 모듈 CSS 작성 — globals.css에서 별 관련 스타일을 옮김**
+- [x] **Step 1: 모듈 CSS 작성 — globals.css에서 별 관련 스타일을 옮김**
 
 `src/components/StarrySky/StarrySky.module.css`:
 ```css
@@ -1509,7 +1509,7 @@ git commit -m "feat(ui): port PersonSilhouette with 5 sitting variants"
 
 `.blink { animation: blink ease-in-out infinite; } @keyframes blink { 0%,100% { opacity: var(--op,0.8); transform: scale(1); } 50% { opacity: 0.15; transform: scale(0.6); } }`
 
-- [ ] **Step 2: 컴포넌트 작성**
+- [x] **Step 2: 컴포넌트 작성**
 
 `src/components/StarrySky/StarrySky.tsx`:
 ```tsx
@@ -1575,12 +1575,12 @@ export function StarrySky() {
 
 ⚠ Hydration 안전: 첫 SSR에서 별 0개 렌더 → mount 후 채움. 또는 `'use client'` 단독으로도 충분(클라이언트에서만 처음 렌더).
 
-- [ ] **Step 3: 빌드 확인**
+- [x] **Step 3: 빌드 확인**
 
 Run: `npm run build`
 Expected: 성공. hydration 에러 없음.
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add src/components/StarrySky
@@ -1596,7 +1596,7 @@ git commit -m "feat(ui): port StarrySky with deterministic-after-mount stars"
 
 소스: `svg-v2.jsx` line ~469-494. SSR 안전 (useMemo 안 씀).
 
-- [ ] **Step 1: 컴포넌트 작성**
+- [x] **Step 1: 컴포넌트 작성**
 
 `src/components/NightField/NightField.tsx`:
 ```tsx
@@ -1630,7 +1630,7 @@ export function NightField() {
 }
 ```
 
-- [ ] **Step 2: 커밋**
+- [x] **Step 2: 커밋**
 
 ```bash
 git add src/components/NightField
@@ -1829,7 +1829,7 @@ git commit -m "feat(ui): static BonfireScene with all visual elements wired"
 
 이제 디자인 번들의 `app-v2.jsx` 의 모든 React 상태와 effect를 옮긴다. SSR/CSR mismatch 방지를 위해 `Date.now()`/`Math.random()` 호출은 useEffect 내부 또는 mount 후로 미룬다.
 
-- [ ] **Step 1: 상태/훅 추가 — 디자인 번들의 모든 상태 1:1**
+- [x] **Step 1: 상태/훅 추가 — 디자인 번들의 모든 상태 1:1**
 
 대상 상태(소스 `app-v2.jsx`):
 - `feedMessages: ChatMessage[]`
@@ -1850,7 +1850,7 @@ git commit -m "feat(ui): static BonfireScene with all visual elements wired"
 
 ID generators는 `useRef(1)`.
 
-- [ ] **Step 2: 모든 useEffect 포팅**
+- [x] **Step 2: 모든 useEffect 포팅**
   1. **silhouettes 동기화** — `onlineCount` 변경 시 visualMax=30까지 추가/제거 + `layoutPos` 적용
   2. **fake online drift** — 6초마다 ±1
   3. **fake stream** — 2.4~6.4초 랜덤 간격으로 `pushMessageFromCrowd`
@@ -1861,7 +1861,7 @@ ID generators는 `useRef(1)`.
   8. **BGM 자동 시작** — 첫 pointerdown/keydown 후 `AudioEngine.startBgm()`
   9. **muted 동기화** — `muted` 변화 시 AudioEngine에 반영
 
-- [ ] **Step 3: 핸들러 함수 포팅**
+- [x] **Step 3: 핸들러 함수 포팅**
   - `pushMessageFromCrowd({ text, nick, sIdx })`
   - `spawnPotatoAtFire(msg)` (MAX_POTATOES=7, 가장 오래된 비-cracked 것 pop)
   - `pokeFire()` (shake + 모든 pile roast +18% + 추가 ember 8개 burst)
@@ -1869,16 +1869,16 @@ ID generators는 `useRef(1)`.
   - `onFireDragOver/Leave/Drop`
   - `onInputDragStart`
 
-- [ ] **Step 4: JSX 확장 — 피드/Comfort/입력바/Sound·Stoke 토글/말풍선 활성화**
+- [x] **Step 4: JSX 확장 — 피드/Comfort/입력바/Sound·Stoke 토글/말풍선 활성화**
 
 소스 `app-v2.jsx` line ~367-587의 JSX 구조를 그대로 옮긴다. Tweaks 패널은 이번 Phase에서 생략(별도 Task 21 옵션).
 
-- [ ] **Step 5: 빌드 확인**
+- [x] **Step 5: 빌드 확인**
 
 Run: `npm run build`
 Expected: 성공. 타입 에러 없음.
 
-- [ ] **Step 6: 개발 서버에서 시각/인터랙션 확인**
+- [x] **Step 6: 개발 서버에서 시각/인터랙션 확인**
 
 Run: `npm run dev`
 
@@ -1895,7 +1895,7 @@ Run: `npm run dev`
 - Sound on/off 토글 동작
 - 콘솔 에러/경고 없음
 
-- [ ] **Step 7: 커밋**
+- [x] **Step 7: 커밋**
 
 ```bash
 git add -A
