@@ -372,12 +372,8 @@ export function BonfireScene() {
       <NightField />
       <div className={styles.fogLayer} />
 
-      {/* Header */}
+      {/* Header — meta 만, 타이틀은 화면을 깔끔하게 비움 */}
       <div className={styles.header}>
-        <div className={styles.brand}>
-          <div className={styles.brandTitle}>군고구마 굽기</div>
-          <div className={styles.brandSub}>chat by the campfire · 익명으로 털어놓기</div>
-        </div>
         <div className={styles.meta}>
           <div className={styles.metaCard}>
             <span className={styles.metaLabel}>지금 모닥불 옆</span>

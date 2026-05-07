@@ -13,14 +13,10 @@
   animation: fogDrift 30s ease-in-out infinite alternate;
 }
 
-/* === Header === */
+/* === Header — 타이틀 제거 후 우측 meta만 노출 === */
 .header {
   position: absolute;
-  top: 26px; left: 0; right: 0;
-  padding: 18px 36px;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  top: 32px; right: 36px;
   z-index: 30;
   pointer-events: none;
 }
