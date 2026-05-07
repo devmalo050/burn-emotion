@@ -392,35 +392,6 @@ export function SweetPotato({
               <ellipse cx="38" cy={bumpY + 13} rx="10" ry="1.2" fill="#fff5cc" opacity="0.7" />
             </g>
 
-            {/* 김 */}
-            <g opacity="0.85" fill="none" stroke="#fff5e8" strokeWidth="1.6" strokeLinecap="round">
-              <path d={`M 32 ${bumpY + 5} Q 28 ${bumpY - 9} 34 ${bumpY - 25}`}>
-                <animate
-                  attributeName="opacity"
-                  values="0.85;0.2;0.85"
-                  dur="2s"
-                  repeatCount="indefinite"
-                />
-              </path>
-              <path d={`M 40 ${bumpY + 3} Q 44 ${bumpY - 11} 40 ${bumpY - 29}`}>
-                <animate
-                  attributeName="opacity"
-                  values="0.7;0.15;0.7"
-                  dur="2.4s"
-                  repeatCount="indefinite"
-                  begin="0.4s"
-                />
-              </path>
-              <path d={`M 48 ${bumpY + 5} Q 52 ${bumpY - 9} 46 ${bumpY - 25}`}>
-                <animate
-                  attributeName="opacity"
-                  values="0.8;0.2;0.8"
-                  dur="2.2s"
-                  repeatCount="indefinite"
-                  begin="0.8s"
-                />
-              </path>
-            </g>
           </g>
         )}
       </g>
