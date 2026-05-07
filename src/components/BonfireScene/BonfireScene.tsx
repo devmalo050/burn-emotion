@@ -53,7 +53,7 @@ export function BonfireScene() {
   const [comfortMsg, setComfortMsg] = useState<(ComfortLine & { key: number }) | null>(null);
   const [embers, setEmbers] = useState<EmberParticle[]>([]);
   const [shake, setShake] = useState(false);
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(false);
   const [audioStarted, setAudioStarted] = useState(false);
   const [onlineCount, setOnlineCount] = useState(24);
   const [totalBurned, setTotalBurned] = useState(8421);
