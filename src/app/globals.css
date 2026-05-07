@@ -67,9 +67,8 @@ html, body {
 }
 
 @keyframes comfortFade {
-  0% { opacity: 0; transform: translate(-50%, -45%); }
-  15%, 75% { opacity: 0.9; transform: translate(-50%, -50%); }
-  100% { opacity: 0; transform: translate(-50%, -55%); }
+  0%, 100% { opacity: 0; }
+  15%, 80% { opacity: 0.92; }
 }
 
 @keyframes feedIn {

@@ -1,23 +1,43 @@
+// 시적·감성적 단어 풀 — 한국어 50×50, 영어 50×50 ≈ 5,000+ 조합
+
 const ADJ_KR = [
   '지친', '흐린', '무거운', '조용한', '외로운', '젖은', '흩어진', '굽은', '텅 빈',
   '느린', '차가운', '어슴푸레한', '낡은', '조각난', '흔들리는', '잔잔한', '헝클어진',
   '깜빡이는', '눅눅한', '삐걱이는', '고요한', '찢어진', '남겨진',
+  '오래된', '식어버린', '멈춰선', '가라앉은', '흩날리는', '무뎌진', '아련한',
+  '미지근한', '잊혀진', '메마른', '머뭇거리는', '비스듬한', '잠긴', '닳아버린',
+  '더딘', '비어있는', '까슬한', '멍든', '숨죽인', '옅은', '깊어진', '시린',
+  '흐릿한', '가냘픈', '그늘진', '서러운', '갸륵한',
 ] as const;
 
 const NOUN_KR = [
   '구름', '달팽이', '고양이', '우산', '라디오', '촛불', '가로등', '그림자', '주전자',
   '엽서', '상자', '파도', '스웨터', '안개', '전구', '노트', '봉투', '청바지',
   '테이프', '양말', '수첩', '유리병', '지하철',
+  '빗자루', '등불', '손수건', '베개', '책갈피', '모포', '단추', '계단', '조약돌',
+  '종이비행기', '목도리', '티스푼', '거울', '옷깃', '우체통', '자판기', '선반',
+  '사다리', '이불', '가방', '모래시계', '종이컵', '양철통', '손전등', '창문',
+  '책상', '편지', '담요',
 ] as const;
 
 const ADJ_EN = [
   'tired', 'blue', 'muffled', 'quiet', 'lonely', 'soggy', 'scattered', 'bent',
   'hollow', 'slow', 'fading', 'creaky', 'dim', 'torn', 'wobbly', 'still', 'tangled',
+  'silent', 'foggy', 'weary', 'gray', 'drifting', 'hushed', 'faint', 'broken',
+  'brittle', 'gentle', 'distant', 'lost', 'sleepy', 'dusky', 'vague', 'flickering',
+  'frayed', 'restless', 'pale', 'fragile', 'weathered', 'dusty', 'salty', 'frozen',
+  'melting', 'drowsy', 'husky', 'tender', 'lukewarm', 'lingering', 'languid',
+  'sullen', 'rusty',
 ] as const;
 
 const NOUN_EN = [
   'cloud', 'snail', 'lamp', 'kettle', 'envelope', 'wave', 'sweater', 'fog',
   'bulb', 'note', 'ribbon', 'tape', 'sock', 'jar', 'ticket', 'page',
+  'postcard', 'blanket', 'button', 'mirror', 'kite', 'candle', 'mug', 'bottle',
+  'drawer', 'scarf', 'stamp', 'balloon', 'raft', 'tin', 'marble', 'fern', 'dial',
+  'key', 'piano', 'photograph', 'telegram', 'pebble', 'paperclip', 'locket',
+  'satchel', 'slipper', 'spool', 'harbor', 'cellar', 'freckle', 'whisper',
+  'lantern', 'pillow', 'shawl',
 ] as const;
 
 const pick = <T>(arr: readonly T[]): T => arr[Math.floor(Math.random() * arr.length)];
