@@ -60,7 +60,6 @@ export function BonfireScene() {
   const [placeholder, setPlaceholder] = useState<string>(PLACEHOLDER_LINES[0]);
   const [draftMessage, setDraftMessage] = useState('');
   const [myNick] = useState(() => makeNickname());
-  const [dragOverFire, setDragOverFire] = useState(false);
   const [silhouettes, setSilhouettes] = useState<SilhouetteEntity[]>([]);
   const [activeBubbles, setActiveBubbles] = useState<Record<number, ActiveBubble>>({});
   const [pile, setPile] = useState<PotatoState[]>([]);
@@ -350,44 +349,6 @@ export function BonfireScene() {
     [draftMessage, myNick, spawnPotatoAtFire],
   );
 
-  const onFireDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOverFire(true);
-  }, []);
-  const onFireDragLeave = useCallback(() => setDragOverFire(false), []);
-  const onFireDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setDragOverFire(false);
-      const text = e.dataTransfer.getData('text/plain') || draftMessage.trim();
-      if (!text) return;
-      setDraftMessage('');
-      const id = messageIdRef.current++;
-      const msg: ChatMessage = {
-        id,
-        text,
-        nick: myNick,
-        sIdx: -1,
-        isMe: true,
-        time: Date.now(),
-      };
-      setTimeout(() => spawnPotatoAtFire(msg), 50);
-    },
-    [draftMessage, myNick, spawnPotatoAtFire],
-  );
-
-  const onInputDragStart = useCallback(
-    (e: React.DragEvent<HTMLInputElement>) => {
-      if (!draftMessage.trim()) {
-        e.preventDefault();
-        return;
-      }
-      e.dataTransfer.setData('text/plain', draftMessage);
-      e.dataTransfer.effectAllowed = 'move';
-    },
-    [draftMessage],
-  );
-
   const fireIntensity = Math.min(1.5, 0.85 + pile.length * 0.04);
   const roastingCount = pile.filter((p) => !p.cracked).length;
 
@@ -490,13 +451,8 @@ export function BonfireScene() {
       {/* Bonfire zone */}
       <div
         ref={fireRef}
-        className={`${styles.bonfireZone} ${shake ? styles.shake : ''} ${
-          dragOverFire ? styles.dragover : ''
-        }`}
+        className={`${styles.bonfireZone} ${shake ? styles.shake : ''}`}
         onClick={pokeFire}
-        onDragOver={onFireDragOver}
-        onDragLeave={onFireDragLeave}
-        onDrop={onFireDrop}
       >
         <Campfire width={280} fireIntensity={fireIntensity} />
 
@@ -558,10 +514,6 @@ export function BonfireScene() {
         )}
       </div>
 
-      {/* Drag hint */}
-      <div className={`${styles.dragHint} ${draftMessage.trim() ? styles.show : ''}`}>
-        ↑ 불 속으로 던져 · throw into the campfire
-      </div>
 
       {/* Stoke button */}
       <button className={styles.stokeButton} onClick={pokeFire}>
@@ -585,16 +537,14 @@ export function BonfireScene() {
             value={draftMessage}
             onChange={(e) => setDraftMessage(e.target.value)}
             placeholder={placeholder}
-            draggable={!!draftMessage.trim()}
-            onDragStart={onInputDragStart}
             maxLength={140}
           />
           <button type="submit" disabled={!draftMessage.trim()}>
-            고구마로 던지기 →
+            보내기
           </button>
         </form>
         <div className={styles.inputHint}>
-          <span>ENTER · throw</span>
+          <span>ENTER · send</span>
           <span className={styles.nick}>@{myNick}</span>
           <span>ANONYMOUS · 익명</span>
         </div>
