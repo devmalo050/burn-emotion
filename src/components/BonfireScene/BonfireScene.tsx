@@ -343,14 +343,30 @@ export function BonfireScene() {
       if (!text) return;
       setDraftMessage('');
       const id = messageIdRef.current++;
+      // 내 메시지도 임의의 사람 한 명에서 풍선 떠오르게 — 군중 속 한 사람 느낌
+      const sIdx = silhouettes.length ? Math.floor(Math.random() * silhouettes.length) : -1;
       const msg: ChatMessage = {
         id,
         text,
         nick: myNick,
-        sIdx: -1,
+        sIdx,
         isMe: true,
         time: Date.now(),
       };
+      if (sIdx >= 0) {
+        const bubbleKey = Date.now() + Math.random();
+        setActiveBubbles((prev) => ({ ...prev, [sIdx]: { text, key: bubbleKey } }));
+        setTimeout(() => {
+          setActiveBubbles((prev) => {
+            if (prev[sIdx]?.key === bubbleKey) {
+              const next = { ...prev };
+              delete next[sIdx];
+              return next;
+            }
+            return prev;
+          });
+        }, 3000);
+      }
       setFeedMessages((prev) => [{ ...msg, nick: msg.nick + ' (나)' }, ...prev].slice(0, 7));
       setTimeout(() => spawnPotatoAtFire(msg), 100);
       setTimeout(() => {
@@ -361,7 +377,7 @@ export function BonfireScene() {
         );
       }, 6500);
     },
-    [draftMessage, myNick, spawnPotatoAtFire],
+    [draftMessage, myNick, silhouettes, spawnPotatoAtFire],
   );
 
   const fireIntensity = Math.min(1.5, 0.85 + pile.length * 0.04);
