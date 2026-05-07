@@ -230,16 +230,16 @@ export function BonfireScene() {
     };
   }, [showFakeTraffic, silhouettes, pushMessageFromCrowd]);
 
-  // === comfort drift ===
+  // === comfort drift — 하늘에 위로 문구 천천히 떠올랐다 사라짐 ===
   useEffect(() => {
     let hideTimer: ReturnType<typeof setTimeout> | null = null;
     const tickFn = () => {
       const c = COMFORT_LINES[Math.floor(Math.random() * COMFORT_LINES.length)];
       setComfortMsg({ ...c, key: Date.now() });
-      hideTimer = setTimeout(() => setComfortMsg(null), 7000);
+      hideTimer = setTimeout(() => setComfortMsg(null), 8000);
     };
-    const initialTimer = setTimeout(tickFn, 6000);
-    const intervalTimer = setInterval(tickFn, 26000);
+    const initialTimer = setTimeout(tickFn, 3000);
+    const intervalTimer = setInterval(tickFn, 18000);
     return () => {
       clearTimeout(initialTimer);
       clearInterval(intervalTimer);

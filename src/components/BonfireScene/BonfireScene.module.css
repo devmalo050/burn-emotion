@@ -518,35 +518,38 @@
 }
 .dragHint.show { opacity: 1; }
 
-/* === Comfort overlay === */
+/* === Comfort overlay — 하늘에 잠깐 떠오르는 위로 문구 === */
 .comfort {
   position: absolute;
-  top: 35%;
+  top: 14%;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   text-align: center;
   z-index: 5;
   max-width: 540px;
   pointer-events: none;
   opacity: 0;
-  animation: comfortFade 7s ease-in-out;
+  animation: comfortFade 8s ease-in-out;
 }
 .comfortQuote {
   font-family: var(--font-kr);
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 300;
-  line-height: 1.6;
-  color: var(--ink);
+  line-height: 1.55;
+  color: rgba(244, 237, 224, 0.95);
   letter-spacing: -0.01em;
   text-wrap: balance;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.7), 0 0 24px rgba(255, 200, 130, 0.2);
 }
 .comfortQuoteEn {
   font-family: var(--font-en);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 300;
-  color: var(--ink-dim);
-  margin-top: 10px;
+  color: rgba(163, 152, 136, 0.85);
+  margin-top: 8px;
   font-style: italic;
+  letter-spacing: 0.02em;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
 }
 
 /* === Side feed — quiet whispers on the right === */
