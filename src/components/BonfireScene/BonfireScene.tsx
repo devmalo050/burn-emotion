@@ -381,16 +381,10 @@ export function BonfireScene() {
       // === 도배 방지 ===
       // 1) 똑같은 메시지 연달아 — 막음
       // 2) 5초 내에 5번 이상 — 막음
-      // 3) 1초 안에 또 보내기 — 막음
       const now = Date.now();
       const last = lastSentRef.current;
       if (text === last.text && now - last.at < 5000) {
         setThrottleNotice('같은 말을 연달아 던질 수 없어요');
-        setTimeout(() => setThrottleNotice(null), 2200);
-        return;
-      }
-      if (now - last.at < 1000) {
-        setThrottleNotice('잠깐 쉬었다가 다시 보내요');
         setTimeout(() => setThrottleNotice(null), 2200);
         return;
       }
