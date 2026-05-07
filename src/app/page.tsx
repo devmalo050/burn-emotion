@@ -1,3 +1,5 @@
+import { BonfireScene } from '@/components/BonfireScene/BonfireScene';
+
 export default function Page() {
-  return <div className="stage" />;
+  return <BonfireScene />;
 }
