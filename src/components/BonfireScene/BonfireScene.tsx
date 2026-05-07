@@ -289,7 +289,7 @@ export function BonfireScene() {
     AudioEngine.setMuted(muted);
   }, [muted]);
 
-  // === poke fire ===
+  // === poke fire (easter egg: tap the campfire to roast faster) ===
   const pokeFire = useCallback(() => {
     AudioEngine.ensure();
     setShake(true);
@@ -350,7 +350,6 @@ export function BonfireScene() {
   );
 
   const fireIntensity = Math.min(1.5, 0.85 + pile.length * 0.04);
-  const roastingCount = pile.filter((p) => !p.cracked).length;
 
   return (
     <div className="stage">
@@ -363,10 +362,10 @@ export function BonfireScene() {
         <div className={styles.brand}>
           <div className={styles.signBoard}>
             <span className={styles.triangle} />
-            <span>CAMP 04 · 감정 군고구마</span>
+            <span>CAMP 04 · 익명 모닥불</span>
           </div>
-          <div className={styles.brandTitle}>감정 쓰레기통</div>
-          <div className={styles.brandSub}>throw it in the campfire · 익명 군고구마</div>
+          <div className={styles.brandTitle}>군고구마 굽기</div>
+          <div className={styles.brandSub}>chat by the campfire · 익명으로 털어놓기</div>
         </div>
         <div className={styles.meta}>
           <div className={styles.metaCard}>
@@ -448,7 +447,7 @@ export function BonfireScene() {
       {/* Fire glow */}
       <div className={styles.fireGlow} style={{ opacity: fireIntensity * 0.7 }} />
 
-      {/* Bonfire zone */}
+      {/* Bonfire zone — clicking it boosts roasting (easter egg) */}
       <div
         ref={fireRef}
         className={`${styles.bonfireZone} ${shake ? styles.shake : ''}`}
@@ -508,17 +507,7 @@ export function BonfireScene() {
           <div className={`${styles.flame} ${styles.fCore}`} />
         </div>
 
-        {/* Pile counter */}
-        {roastingCount > 0 && (
-          <div className={styles.pileCounter}>{roastingCount}개 굽는 중 · tap to stoke</div>
-        )}
       </div>
-
-
-      {/* Stoke button */}
-      <button className={styles.stokeButton} onClick={pokeFire}>
-        🔥 {roastingCount > 0 ? `불 쑤시기 · stoke (${roastingCount})` : '불 쑤시기 · stoke'}
-      </button>
 
       {/* Sound */}
       <button className={styles.soundToggle} onClick={() => setMuted((m) => !m)}>

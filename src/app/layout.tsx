@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: '감정 쓰레기통 · 모닥불에서 군고구마를 굽는 익명 채팅',
-  description: '오늘의 감정을 모닥불에 던지면 군고구마가 됩니다. 익명으로, 조용히, 천천히.',
+  title: '군고구마 굽기 · 모닥불 옆에서 익명으로 털어놓는 채팅',
+  description: '캠프파이어 옆에서 채팅을 치면 군고구마가 익어갑니다. 익명으로, 조용히, 천천히.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
