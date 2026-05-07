@@ -70,17 +70,30 @@ export function BonfireScene() {
   const potatoIdRef = useRef(1);
   const emberIdRef = useRef(1);
 
-  // === spawn potato AT the fire (no flying arc) ===
+  // === spawn potato AT the fire — stable slot so existing potatoes
+  // don't reshuffle. At max capacity, only replace an already-cracked
+  // potato (don't kick out a still-roasting one); otherwise skip silently. ===
   const spawnPotatoAtFire = useCallback((msg: ChatMessage) => {
     const id = potatoIdRef.current++;
     const seed = id;
     setPile((prev) => {
       let next = prev;
       if (next.length >= MAX_POTATOES) {
-        const idx = next.findIndex((p) => !p.cracked);
-        if (idx >= 0) next = next.filter((_, i) => i !== idx);
-        else next = next.slice(1);
-        setTotalBurned((t) => t + 1);
+        const crackedIdx = next.findIndex((p) => p.cracked);
+        if (crackedIdx >= 0) {
+          next = next.filter((_, i) => i !== crackedIdx);
+        } else {
+          // 모든 자리에서 아직 익는 중 — 자리 양보 없이 소리없이 거름
+          return prev;
+        }
+      }
+      const used = new Set(next.map((p) => p.slotIdx));
+      let freeSlot = 0;
+      for (let s = 0; s < POTATO_SLOTS.length; s++) {
+        if (!used.has(s)) {
+          freeSlot = s;
+          break;
+        }
       }
       return [
         ...next,
@@ -93,6 +106,7 @@ export function BonfireScene() {
           crackedAt: 0,
           placedAt: performance.now(),
           wobble: (id * 1.7) % 1,
+          slotIdx: freeSlot,
         },
       ];
     });
@@ -203,25 +217,25 @@ export function BonfireScene() {
     return () => clearInterval(t);
   }, []);
 
-  // === sparse embers ===
+  // === embers — 활활 타오르는 모닥불에서 빈번하게 솟구침 ===
   useEffect(() => {
     const removalTimers = new Set<ReturnType<typeof setTimeout>>();
     const t = setInterval(() => {
       const id = emberIdRef.current++;
       const newEmber: EmberParticle = {
         id,
-        startX: -20 + Math.random() * 40,
-        endX: -50 + Math.random() * 100,
-        endY: -120 - Math.random() * 180,
-        duration: 3000 + Math.random() * 2200,
+        startX: -30 + Math.random() * 60,
+        endX: -80 + Math.random() * 160,
+        endY: -180 - Math.random() * 280,
+        duration: 2400 + Math.random() * 2600,
       };
-      setEmbers((prev) => [...prev.slice(-15), newEmber]);
+      setEmbers((prev) => [...prev.slice(-30), newEmber]);
       const removal = setTimeout(() => {
         setEmbers((prev) => prev.filter((e) => e.id !== id));
         removalTimers.delete(removal);
       }, newEmber.duration + 100);
       removalTimers.add(removal);
-    }, 600);
+    }, 220);
     return () => {
       clearInterval(t);
       for (const r of removalTimers) clearTimeout(r);
@@ -360,46 +374,34 @@ export function BonfireScene() {
       {/* Header */}
       <div className={styles.header}>
         <div className={styles.brand}>
-          <div className={styles.signBoard}>
-            <span className={styles.triangle} />
-            <span>CAMP 04 · 익명 모닥불</span>
-          </div>
           <div className={styles.brandTitle}>군고구마 굽기</div>
           <div className={styles.brandSub}>chat by the campfire · 익명으로 털어놓기</div>
         </div>
         <div className={styles.meta}>
           <div className={styles.metaCard}>
-            <span className={styles.metaLabel}>Around fire</span>
+            <span className={styles.metaLabel}>지금 모닥불 옆</span>
             <span className={styles.metaValue}>
               <span className={styles.liveDot} />
-              {onlineCount}
+              {onlineCount}명
             </span>
           </div>
           <div className={styles.metaCard}>
-            <span className={styles.metaLabel}>Roasted tonight</span>
-            <span className={styles.metaValue}>{totalBurned.toLocaleString()}</span>
+            <span className={styles.metaLabel}>오늘 구워진 고구마</span>
+            <span className={styles.metaValue}>{totalBurned.toLocaleString()}개</span>
           </div>
         </div>
       </div>
 
-      {/* Side feed */}
+      {/* Side feed — quiet whispers heard around the fire */}
       <div className={styles.feed}>
-        <div className={styles.feedHeader}>
-          <span>
-            <span className={styles.blink}>●</span> Live · 들리는 말들
-          </span>
-          <span>{feedMessages.length}</span>
-        </div>
+        <div className={styles.feedHeader}>들리는 말들</div>
         {feedMessages.map((m) => (
           <div
             key={m.id}
             className={`${styles.feedItem} ${m.fading ? styles.fading : ''}`}
           >
-            <div className={styles.feedMeta}>
-              <span className={styles.feedNick}>@{m.nick}</span>
-              <span className={styles.feedTime}>방금</span>
-            </div>
-            <div>{m.text}</div>
+            <div className={styles.feedNick}>{m.nick}</div>
+            <div className={styles.feedText}>{m.text}</div>
           </div>
         ))}
       </div>
@@ -428,7 +430,7 @@ export function BonfireScene() {
               className={styles.silhouetteNick}
               style={{ transform: `translateX(-50%) ${s.flip ? 'scaleX(-1)' : ''}` }}
             >
-              @{s.nick.slice(0, 16)}
+              {s.nick.slice(0, 16)}
             </div>
             <PersonSilhouette variant={s.variant} scale={s.scale} />
             {activeBubbles[i] && (
@@ -457,8 +459,8 @@ export function BonfireScene() {
 
         {/* Roasting potatoes */}
         <div className={styles.potatoRow}>
-          {pile.map((p, i) => {
-            const slot = POTATO_SLOTS[i % POTATO_SLOTS.length];
+          {pile.map((p) => {
+            const slot = POTATO_SLOTS[p.slotIdx % POTATO_SLOTS.length];
             return (
               <div
                 key={p.id}
@@ -509,11 +511,6 @@ export function BonfireScene() {
 
       </div>
 
-      {/* Sound */}
-      <button className={styles.soundToggle} onClick={() => setMuted((m) => !m)}>
-        {muted ? '◎ Sound off' : '◉ Sound on'}
-      </button>
-
       {/* Input */}
       <div className={styles.inputZone}>
         <form
@@ -533,9 +530,14 @@ export function BonfireScene() {
           </button>
         </form>
         <div className={styles.inputHint}>
-          <span>ENTER · send</span>
-          <span className={styles.nick}>@{myNick}</span>
-          <span>ANONYMOUS · 익명</span>
+          익명 · <span className={styles.nick}>{myNick}</span>
+          <button
+            type="button"
+            className={styles.soundToggle}
+            onClick={() => setMuted((m) => !m)}
+          >
+            {muted ? '소리 꺼짐' : '소리 켜짐'}
+          </button>
         </div>
       </div>
 

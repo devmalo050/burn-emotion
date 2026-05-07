@@ -23,6 +23,8 @@ export interface PotatoState {
   /** performance.now() when added */
   placedAt: number;
   wobble: number;
+  /** stable slot index in POTATO_SLOTS — does not shift when other potatoes leave */
+  slotIdx: number;
 }
 
 export interface SilhouetteEntity {
