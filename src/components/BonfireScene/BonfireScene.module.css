@@ -262,7 +262,7 @@
 /* === Potatoes nestled on the campfire logs === */
 .potatoRow {
   position: absolute;
-  bottom: 30px;
+  bottom: 6px;
   left: 0;
   right: 0;
   height: 80px;
