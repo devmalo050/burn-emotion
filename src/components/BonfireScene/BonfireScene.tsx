@@ -590,6 +590,9 @@ export function BonfireScene() {
 
       {/* Input */}
       <div className={styles.inputZone}>
+        {throttleNotice && (
+          <div className={styles.throttleNotice}>{throttleNotice}</div>
+        )}
         <form
           className={`${styles.inputBar} ${draftMessage.trim() ? styles.glow : ''}`}
           onSubmit={submit}
@@ -679,9 +682,6 @@ export function BonfireScene() {
             </button>
           )}
         </div>
-        {throttleNotice && (
-          <div className={styles.throttleNotice}>{throttleNotice}</div>
-        )}
       </div>
 
       <div className={styles.grain} />
