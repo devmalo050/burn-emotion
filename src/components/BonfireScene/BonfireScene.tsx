@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Campfire } from '@/components/Campfire/Campfire';
+import { Flames } from '@/components/Flames/Flames';
 import { SweetPotato } from '@/components/SweetPotato/SweetPotato';
 import { PersonSilhouette } from '@/components/PersonSilhouette/PersonSilhouette';
 import { StarrySky } from '@/components/StarrySky/StarrySky';
@@ -498,22 +499,9 @@ export function BonfireScene() {
           ))}
         </div>
 
-        {/* Animated flames */}
-        <div
-          className={styles.campfireFlames}
-          style={{ ['--intensity' as string]: fireIntensity } as React.CSSProperties}
-        >
-          <div className={`${styles.flame} ${styles.ft4}`} />
-          <div className={`${styles.flame} ${styles.ft5}`} />
-          <div className={`${styles.flame} ${styles.ft2}`} />
-          <div className={`${styles.flame} ${styles.ft3}`} />
-          <div className={`${styles.flame} ${styles.ft1}`} />
-          <div className={`${styles.flame} ${styles.ft6}`} />
-          <div className={`${styles.flame} ${styles.ft7}`} />
-          <div className={styles.fCore} />
-          <div className={`${styles.wisp} ${styles.wisp1}`} />
-          <div className={`${styles.wisp} ${styles.wisp2}`} />
-          <div className={`${styles.wisp} ${styles.wisp3}`} />
+        {/* Animated flames — SVG turbulence-distorted ellipses */}
+        <div className={styles.campfireFlames}>
+          <Flames width={240} intensity={fireIntensity} />
         </div>
 
       </div>

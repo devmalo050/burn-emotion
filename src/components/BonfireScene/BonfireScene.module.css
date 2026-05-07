@@ -142,155 +142,16 @@
 }
 
 /* === Campfire flames sit on top of logs === */
+/* SVG-based Flames 컴포넌트의 위치 컨테이너 */
 .campfireFlames {
   position: absolute;
-  top: -40px;
+  top: -50px;
   left: 50%;
   transform: translateX(-50%);
   width: 240px;
-  height: 260px;
+  height: 280px;
   pointer-events: none;
   z-index: 13;
-  --intensity: 1;
-}
-/* 가늘고 키 큰 tongue 실루엣 — 위로 갈수록 뾰족해지는 진짜 불꽃 혀 모양
-   (사진처럼 height >> width 비율) */
-.campfireFlames .flame {
-  position: absolute;
-  bottom: 0;
-  background: linear-gradient(180deg,
-    transparent 0%,
-    rgba(255, 100, 30, 0.5) 4%,
-    var(--ember) 12%,
-    var(--ember-hot) 35%,
-    var(--ember-pale) 70%,
-    #fff7d6 100%);
-  clip-path: polygon(
-    50% 0%,
-    56% 4%, 60% 10%, 62% 18%,
-    66% 30%, 64% 42%, 60% 52%, 64% 60%,
-    70% 70%, 72% 82%, 64% 92%, 58% 100%,
-    42% 100%, 36% 92%, 28% 82%, 30% 70%,
-    36% 60%, 40% 52%, 36% 42%, 34% 30%,
-    38% 18%, 40% 10%, 44% 4%
-  );
-  filter: blur(0.6px);
-  mix-blend-mode: screen;
-  transform-origin: 50% 100%;
-  opacity: calc(0.95 * var(--intensity));
-}
-
-/* 7갈래 — 사진처럼 폭은 좁고 키는 큼. 위치/높이를 다르게 해 자연스럽게 펼침 */
-.campfireFlames .ft1 {
-  left: 50%; margin-left: -16px;
-  width: 32px; height: 240px;
-  animation: tongueLeap 0.5s ease-in-out infinite alternate;
-  z-index: 4;
-}
-.campfireFlames .ft2 {
-  left: 50%; margin-left: -55px;
-  width: 26px; height: 180px;
-  animation: tongueWave 0.42s ease-in-out infinite alternate;
-  animation-delay: 0.06s;
-  filter: blur(0.9px);
-  z-index: 3;
-}
-.campfireFlames .ft3 {
-  left: 50%; margin-left: 28px;
-  width: 28px; height: 200px;
-  animation: tongueFlick 0.46s ease-in-out infinite alternate;
-  animation-delay: 0.12s;
-  filter: blur(0.9px);
-  z-index: 3;
-}
-.campfireFlames .ft4 {
-  left: 50%; margin-left: -85px;
-  width: 22px; height: 140px;
-  animation: tongueWave 0.36s ease-in-out infinite alternate;
-  animation-delay: 0.2s;
-  filter: blur(1.2px);
-  opacity: calc(0.78 * var(--intensity));
-  z-index: 2;
-}
-.campfireFlames .ft5 {
-  left: 50%; margin-left: 56px;
-  width: 24px; height: 160px;
-  animation: tongueLeap 0.4s ease-in-out infinite alternate;
-  animation-delay: 0.08s;
-  filter: blur(1.2px);
-  opacity: calc(0.82 * var(--intensity));
-  z-index: 2;
-}
-.campfireFlames .ft6 {
-  left: 50%; margin-left: -38px;
-  width: 20px; height: 215px;
-  animation: tongueFlick 0.55s ease-in-out infinite alternate;
-  animation-delay: 0.15s;
-  filter: blur(0.7px);
-  z-index: 4;
-}
-.campfireFlames .ft7 {
-  left: 50%; margin-left: 8px;
-  width: 22px; height: 225px;
-  animation: tongueWave 0.48s ease-in-out infinite alternate;
-  animation-delay: 0.03s;
-  filter: blur(0.7px);
-  z-index: 4;
-}
-
-/* 가장 안쪽 흰 코어 — 짧고 강렬하게 빛나는 중심 */
-.campfireFlames .fCore {
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  margin-left: -14px;
-  width: 28px; height: 110px;
-  background: linear-gradient(180deg,
-    transparent 0%,
-    var(--ember-hot) 18%,
-    #ffefa0 50%,
-    #fff 100%);
-  clip-path: polygon(
-    50% 0%,
-    62% 18%, 66% 36%, 60% 52%,
-    66% 70%, 60% 88%, 56% 100%,
-    44% 100%, 40% 88%, 34% 70%,
-    40% 52%, 34% 36%, 38% 18%
-  );
-  filter: blur(0.5px);
-  mix-blend-mode: screen;
-  transform-origin: 50% 100%;
-  animation: tongueCore 0.24s ease-in-out infinite alternate;
-  opacity: calc(1 * var(--intensity));
-  z-index: 5;
-}
-
-/* 꺼져가는 작은 wisp들 — 위로 치솟다 사라짐 */
-.campfireFlames .wisp {
-  position: absolute;
-  bottom: 50%;
-  width: 14px; height: 36px;
-  background: linear-gradient(180deg, transparent 0%, var(--ember-hot) 45%, var(--ember-pale) 100%);
-  clip-path: polygon(50% 0%, 70% 30%, 80% 60%, 65% 100%, 35% 100%, 20% 60%, 30% 30%);
-  filter: blur(1px);
-  mix-blend-mode: screen;
-  opacity: 0;
-  pointer-events: none;
-}
-.campfireFlames .wisp1 {
-  left: 32%;
-  animation: wispRise 1.4s ease-out infinite;
-  animation-delay: 0.1s;
-}
-.campfireFlames .wisp2 {
-  left: 58%;
-  animation: wispRise 1.6s ease-out infinite;
-  animation-delay: 0.7s;
-}
-.campfireFlames .wisp3 {
-  left: 46%;
-  animation: wispRise 1.2s ease-out infinite;
-  animation-delay: 1.1s;
 }
 
 /* === Potatoes nestled on the campfire logs === */
@@ -577,7 +438,7 @@
   position: absolute;
   top: 140px;
   right: 36px;
-  width: 240px;
+  width: 250px;
   z-index: 15;
   pointer-events: none;
   display: flex;
@@ -592,30 +453,30 @@
   font-family: var(--font-kr);
   font-size: 11px;
   letter-spacing: 0.18em;
-  font-weight: 300;
+  font-weight: 400;
   font-style: italic;
-  color: rgba(163, 152, 136, 0.55);
-  margin-bottom: 4px;
+  color: rgba(232, 129, 70, 0.85);
+  margin-bottom: 6px;
 }
 .feedItem {
   font-family: var(--font-kr);
   color: var(--ink);
   animation: feedIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-  opacity: 0.92;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.85);
 }
 .feedItem.fading { animation: feedOut 0.5s ease-in forwards; }
 .feedNick {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 0.06em;
-  color: rgba(232, 129, 70, 0.55);
+  color: rgba(232, 129, 70, 0.95);
   margin-bottom: 3px;
 }
 .feedText {
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.55;
-  font-weight: 300;
-  color: rgba(239, 232, 217, 0.78);
+  font-weight: 400;
+  color: rgba(244, 237, 224, 0.98);
 }
 
 /* === Sound toggle — inline under input, minimal === */
