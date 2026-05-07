@@ -1,5 +1,5 @@
-import { BonfireScene } from '@/components/BonfireScene/BonfireScene';
+import BonfireSceneClient from '@/components/BonfireScene/BonfireSceneClient';
 
 export default function Page() {
-  return <BonfireScene />;
+  return <BonfireSceneClient />;
 }
