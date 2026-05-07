@@ -1,7 +1,6 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Campfire } from '@/components/Campfire/Campfire';
-import { Flames } from '@/components/Flames/Flames';
 import { SweetPotato } from '@/components/SweetPotato/SweetPotato';
 import { PersonSilhouette } from '@/components/PersonSilhouette/PersonSilhouette';
 import { StarrySky } from '@/components/StarrySky/StarrySky';
@@ -495,9 +494,20 @@ export function BonfireScene() {
           ))}
         </div>
 
-        {/* Animated flames — SVG turbulence-distorted ellipses */}
-        <div className={styles.campfireFlames}>
-          <Flames width={240} intensity={fireIntensity} />
+        {/* Animated flames — radial-gradient teardrops, tall and narrow,
+            multiple layers + aggressive leap = 활활 타오르는 캠프파이어 */}
+        <div
+          className={styles.campfireFlames}
+          style={{ ['--intensity' as string]: fireIntensity } as React.CSSProperties}
+        >
+          <div className={`${styles.flame} ${styles.fHaze}`} />
+          <div className={`${styles.flame} ${styles.fBackL}`} />
+          <div className={`${styles.flame} ${styles.fBackR}`} />
+          <div className={`${styles.flame} ${styles.fBack}`} />
+          <div className={`${styles.flame} ${styles.fMid}`} />
+          <div className={`${styles.flame} ${styles.fFront}`} />
+          <div className={`${styles.flame} ${styles.fCore}`} />
+          <div className={`${styles.flame} ${styles.fInner}`} />
         </div>
 
       </div>

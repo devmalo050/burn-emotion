@@ -138,16 +138,125 @@
 }
 
 /* === Campfire flames sit on top of logs === */
-/* SVG-based Flames 컴포넌트의 위치 컨테이너 */
+/* === Campfire flames — 활활 타오르는 키 큰 teardrop 레이어 ===
+   처음 디자인의 radial-gradient + border-radius 방식으로 복귀.
+   대신 height >> width 비율로 잡고 leap을 더 격렬하게 + 좌우 외곽 추가.
+   mix-blend-mode: screen + 여러 레이어 = 뾰족하게 솟구치는 캠프파이어 느낌. */
 .campfireFlames {
   position: absolute;
   top: -50px;
   left: 50%;
   transform: translateX(-50%);
-  width: 240px;
+  width: 260px;
   height: 280px;
   pointer-events: none;
   z-index: 13;
+  --intensity: 1;
+}
+.campfireFlames .flame {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  background: radial-gradient(ellipse at 50% 100%,
+    #fff7d6 0%,
+    var(--ember-pale) 22%,
+    var(--ember-hot) 45%,
+    var(--ember) 70%,
+    var(--rust-deep) 90%,
+    transparent 100%);
+  border-radius: 50% 50% 30% 30% / 90% 90% 15% 15%;
+  filter: blur(1.2px);
+  mix-blend-mode: screen;
+  transform-origin: 50% 100%;
+  opacity: calc(0.9 * var(--intensity));
+  will-change: transform;
+}
+
+/* 가장 외곽 — 큰 따뜻한 글로우 (atmospheric). 매우 크고 흐림 */
+.campfireFlames .fHaze {
+  width: 180px; height: 240px;
+  margin-left: -90px;
+  filter: blur(16px);
+  opacity: calc(0.5 * var(--intensity));
+  animation: campLeap 1.4s ease-in-out infinite alternate;
+  background: radial-gradient(ellipse at 50% 100%,
+    var(--ember-hot) 0%,
+    var(--ember) 35%,
+    var(--rust-deep) 70%,
+    transparent 100%);
+}
+
+/* 좌측 외곽 작은 혀 — 살짝 기울어 좌측 위로 */
+.campfireFlames .fBackL {
+  width: 56px; height: 200px;
+  margin-left: -76px;
+  filter: blur(2.5px);
+  opacity: calc(0.7 * var(--intensity));
+  animation: campLeapLean 0.7s ease-in-out infinite alternate;
+  animation-delay: 0.05s;
+}
+
+/* 우측 외곽 작은 혀 — 살짝 기울어 우측 위로 */
+.campfireFlames .fBackR {
+  width: 56px; height: 200px;
+  margin-left: 20px;
+  filter: blur(2.5px);
+  opacity: calc(0.7 * var(--intensity));
+  animation: campLeapLeanR 0.62s ease-in-out infinite alternate;
+  animation-delay: 0.1s;
+}
+
+/* 메인 뒤쪽 큰 혀 */
+.campfireFlames .fBack {
+  width: 90px; height: 250px;
+  margin-left: -45px;
+  filter: blur(1.5px);
+  animation: campLeap 0.55s ease-in-out infinite alternate;
+}
+
+/* 가운데 본체 */
+.campfireFlames .fMid {
+  width: 70px; height: 230px;
+  margin-left: -35px;
+  filter: blur(1px);
+  animation: campLeap2 0.42s ease-in-out infinite alternate;
+  animation-delay: 0.08s;
+}
+
+/* 앞쪽 좁은 혀 */
+.campfireFlames .fFront {
+  width: 50px; height: 200px;
+  margin-left: -25px;
+  filter: blur(0.8px);
+  animation: campLeap3 0.36s ease-in-out infinite alternate;
+  animation-delay: 0.15s;
+}
+
+/* 흰 코어 */
+.campfireFlames .fCore {
+  width: 36px; height: 170px;
+  margin-left: -18px;
+  background: radial-gradient(ellipse at 50% 100%,
+    #fff 0%,
+    #ffefa0 25%,
+    var(--ember-hot) 60%,
+    transparent 100%);
+  filter: blur(0.8px);
+  animation: campLeap2 0.28s ease-in-out infinite alternate;
+}
+
+/* 가장 안쪽 흰빛 끝 */
+.campfireFlames .fInner {
+  width: 22px; height: 130px;
+  margin-left: -11px;
+  background: radial-gradient(ellipse at 50% 100%,
+    #fff 0%,
+    #fff 30%,
+    rgba(255, 239, 160, 0.6) 70%,
+    transparent 100%);
+  filter: blur(0.5px);
+  animation: campLeap3 0.22s ease-in-out infinite alternate;
+  opacity: calc(0.95 * var(--intensity));
 }
 
 /* === Potatoes nestled on the campfire logs === */
