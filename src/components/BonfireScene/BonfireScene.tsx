@@ -56,8 +56,9 @@ export function BonfireScene() {
   const [muted, setMuted] = useState(false);
   const [showPeople, setShowPeople] = useState(true);
   const [audioStarted, setAudioStarted] = useState(false);
-  const [onlineCount, setOnlineCount] = useState(24);
-  const [totalBurned, setTotalBurned] = useState(8421);
+  const [showFakeTraffic, setShowFakeTraffic] = useState(false);
+  const [onlineCount, setOnlineCount] = useState(1);
+  const [totalBurned, setTotalBurned] = useState(0);
   const [placeholder, setPlaceholder] = useState<string>(PLACEHOLDER_LINES[0]);
   const [draftMessage, setDraftMessage] = useState('');
   const [myNick] = useState(() => makeNickname());
@@ -67,6 +68,16 @@ export function BonfireScene() {
 
   const fireRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  // 도배 방지용 — 마지막 보낸 메시지 텍스트와 시각, 직전 N초 내 보낸 횟수
+  const lastSentRef = useRef<{ text: string; at: number; recent: number[] }>({
+    text: '',
+    at: 0,
+    recent: [],
+  });
+  const [throttleNotice, setThrottleNotice] = useState<string | null>(null);
+  // 가짜 트래픽 토글이 OFF로 꺼졌을 때, in-flight으로 떠있던 setTimeout이
+  // 마저 발사돼 가짜 고구마를 spawn하는 race를 막기 위한 ref
+  const fakeTrafficRef = useRef(showFakeTraffic);
   const messageIdRef = useRef(1);
   const potatoIdRef = useRef(1);
   const emberIdRef = useRef(1);
@@ -135,7 +146,11 @@ export function BonfireScene() {
       }
 
       setFeedMessages((prev) => [msg, ...prev].slice(0, 7));
-      setTimeout(() => spawnPotatoAtFire(msg), 1500 + Math.random() * 1200);
+      // 가짜 트래픽 토글이 꺼지면 spawn 안 되게 ref 게이트
+      setTimeout(() => {
+        if (!fakeTrafficRef.current) return;
+        spawnPotatoAtFire(msg);
+      }, 1500 + Math.random() * 1200);
       setTimeout(() => {
         setFeedMessages((prev) => prev.map((x) => (x.id === id ? { ...x, fading: true } : x)));
         setTimeout(
@@ -174,16 +189,27 @@ export function BonfireScene() {
     });
   }, [onlineCount, myNick]);
 
-  // === fake online drift ===
+  // ref 동기화 — 토글 OFF 후에도 진행 중인 setTimeout에서 최신값 읽기 위함
   useEffect(() => {
+    fakeTrafficRef.current = showFakeTraffic;
+  }, [showFakeTraffic]);
+
+  // === fake online drift — 토글 ON일 때만 ===
+  useEffect(() => {
+    if (!showFakeTraffic) {
+      setOnlineCount(1);
+      return;
+    }
+    setOnlineCount((c) => (c < 8 ? 24 : c));
     const t = setInterval(() => {
       setOnlineCount((c) => Math.max(8, Math.min(36, c + (Math.random() < 0.5 ? -1 : 1))));
     }, 6000);
     return () => clearInterval(t);
-  }, []);
+  }, [showFakeTraffic]);
 
-  // === fake stream ===
+  // === fake stream — 토글 ON일 때만 ===
   useEffect(() => {
+    if (!showFakeTraffic) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const tickFn = () => {
@@ -202,7 +228,7 @@ export function BonfireScene() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [silhouettes, pushMessageFromCrowd]);
+  }, [showFakeTraffic, silhouettes, pushMessageFromCrowd]);
 
   // === comfort drift ===
   useEffect(() => {
@@ -352,6 +378,29 @@ export function BonfireScene() {
       e?.preventDefault?.();
       const text = draftMessage.trim();
       if (!text) return;
+      // === 도배 방지 ===
+      // 1) 똑같은 메시지 연달아 — 막음
+      // 2) 5초 내에 5번 이상 — 막음
+      // 3) 1초 안에 또 보내기 — 막음
+      const now = Date.now();
+      const last = lastSentRef.current;
+      if (text === last.text && now - last.at < 5000) {
+        setThrottleNotice('같은 말을 연달아 던질 수 없어요');
+        setTimeout(() => setThrottleNotice(null), 2200);
+        return;
+      }
+      if (now - last.at < 1000) {
+        setThrottleNotice('잠깐 쉬었다가 다시 보내요');
+        setTimeout(() => setThrottleNotice(null), 2200);
+        return;
+      }
+      const recent = last.recent.filter((t) => now - t < 5000);
+      if (recent.length >= 5) {
+        setThrottleNotice('너무 빨리 던지고 있어요. 잠깐 숨 고르기');
+        setTimeout(() => setThrottleNotice(null), 2200);
+        return;
+      }
+      lastSentRef.current = { text, at: now, recent: [...recent, now] };
       setDraftMessage('');
       const id = messageIdRef.current++;
       // 내 메시지는 인덱스 0번 (= 내 실루엣) 위에서 떠오름
@@ -418,7 +467,6 @@ export function BonfireScene() {
 
       {/* Side feed — quiet whispers heard around the fire */}
       <div className={styles.feed}>
-        <div className={styles.feedHeader}>들리는 말들</div>
         {feedMessages.map((m) => (
           <div
             key={m.id}
@@ -559,22 +607,81 @@ export function BonfireScene() {
           </button>
         </form>
         <div className={styles.inputHint}>
-          익명 · <span className={styles.nick}>{myNick}</span>
+          <span className={styles.nick}>{myNick}</span>
           <button
             type="button"
-            className={styles.soundToggle}
+            className={styles.iconToggle}
             onClick={() => setMuted((m) => !m)}
+            aria-label={muted ? '소리 켜기' : '소리 끄기'}
+            title={muted ? '소리 켜기' : '소리 끄기'}
           >
-            {muted ? '소리 꺼짐' : '소리 켜짐'}
+            {muted ? (
+              // mute (사선 있는 스피커)
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path d="M3 6h2.5L8 4v8L5.5 10H3V6z" fill="currentColor" />
+                <path d="M11.5 6.5l3 3M14.5 6.5l-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+            ) : (
+              // sound on (스피커 + 음파)
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path d="M3 6h2.5L8 4v8L5.5 10H3V6z" fill="currentColor" />
+                <path d="M11 5.5c1 .8 1 4.2 0 5M13 4c1.6 1.4 1.6 6.6 0 8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none" />
+              </svg>
+            )}
           </button>
           <button
             type="button"
-            className={styles.soundToggle}
+            className={styles.iconToggle}
             onClick={() => setShowPeople((s) => !s)}
+            aria-label={showPeople ? '사람 숨기기' : '사람 보이기'}
+            title={showPeople ? '사람 숨기기' : '사람 보이기'}
           >
-            {showPeople ? '사람 보임' : '사람 숨김'}
+            {showPeople ? (
+              // people on (두 사람)
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <circle cx="5" cy="5" r="2" />
+                <circle cx="11" cy="5" r="2" />
+                <path d="M2 13c0-2 1.5-3.5 3-3.5s3 1.5 3 3.5H2zM8 13c0-2 1.5-3.5 3-3.5s3 1.5 3 3.5H8z" />
+              </svg>
+            ) : (
+              // people off (두 사람 + 사선)
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <g fill="currentColor" opacity="0.5">
+                  <circle cx="5" cy="5" r="2" />
+                  <circle cx="11" cy="5" r="2" />
+                  <path d="M2 13c0-2 1.5-3.5 3-3.5s3 1.5 3 3.5H2zM8 13c0-2 1.5-3.5 3-3.5s3 1.5 3 3.5H8z" />
+                </g>
+                <path d="M2 14L14 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+            )}
           </button>
+          {process.env.NODE_ENV === 'development' && (
+            <button
+              type="button"
+              className={styles.iconToggle}
+              onClick={() => setShowFakeTraffic((s) => !s)}
+              aria-label={showFakeTraffic ? '가짜 트래픽 끄기' : '가짜 트래픽 켜기'}
+              title={showFakeTraffic ? '가짜 트래픽 끄기 (dev)' : '가짜 트래픽 켜기 (dev)'}
+              style={{ opacity: showFakeTraffic ? 1 : 0.6 }}
+            >
+              {/* flask icon — dev test */}
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M6 2h4M6.5 2v4l-3 6.5c-.4.9.2 1.5 1 1.5h7c.8 0 1.4-.6 1-1.5l-3-6.5V2"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill={showFakeTraffic ? 'currentColor' : 'none'}
+                  fillOpacity={showFakeTraffic ? 0.25 : 0}
+                />
+              </svg>
+            </button>
+          )}
         </div>
+        {throttleNotice && (
+          <div className={styles.throttleNotice}>{throttleNotice}</div>
+        )}
       </div>
 
       <div className={styles.grain} />

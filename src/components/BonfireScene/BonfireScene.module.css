@@ -482,14 +482,23 @@
   cursor: not-allowed;
 }
 .inputHint {
-  margin-top: 6px;
+  margin-top: 8px;
   font-family: var(--font-mono);
   font-size: 9px;
   letter-spacing: 0.1em;
   color: rgba(94, 86, 75, 0.7);
-  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 2px;
 }
-.inputHint .nick { color: rgba(232, 129, 70, 0.55); }
+.inputHint .nick {
+  color: rgba(232, 129, 70, 0.7);
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  line-height: 22px;
+}
 
 /* === Drag hint === */
 .dragHint {
@@ -601,6 +610,40 @@
   transition: color 0.2s ease;
 }
 .soundToggle:hover { color: rgba(232, 129, 70, 0.7); }
+
+/* 아이콘 토글 — 입력바 아래 작은 SVG 버튼 */
+.iconToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: none;
+  border: none;
+  color: rgba(120, 110, 95, 0.7);
+  cursor: pointer;
+  padding: 0;
+  margin-left: 6px;
+  border-radius: 50%;
+  transition: color 0.2s ease, background 0.2s ease;
+  line-height: 0;
+  vertical-align: middle;
+}
+.iconToggle:hover {
+  color: rgba(232, 129, 70, 0.9);
+  background: rgba(255, 140, 58, 0.06);
+}
+
+/* 도배 알림 */
+.throttleNotice {
+  margin-top: 6px;
+  font-family: var(--font-kr);
+  font-size: 11px;
+  color: rgba(232, 129, 70, 0.85);
+  text-align: center;
+  font-style: italic;
+  animation: feedIn 0.3s ease-out;
+}
 
 /* === Stoke fire button === */
 .stokeButton {
