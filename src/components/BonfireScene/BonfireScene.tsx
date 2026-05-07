@@ -503,10 +503,17 @@ export function BonfireScene() {
           className={styles.campfireFlames}
           style={{ ['--intensity' as string]: fireIntensity } as React.CSSProperties}
         >
-          <div className={`${styles.flame} ${styles.fBack}`} />
-          <div className={`${styles.flame} ${styles.fMid}`} />
-          <div className={`${styles.flame} ${styles.fFront}`} />
-          <div className={`${styles.flame} ${styles.fCore}`} />
+          <div className={`${styles.flame} ${styles.ft4}`} />
+          <div className={`${styles.flame} ${styles.ft5}`} />
+          <div className={`${styles.flame} ${styles.ft2}`} />
+          <div className={`${styles.flame} ${styles.ft3}`} />
+          <div className={`${styles.flame} ${styles.ft1}`} />
+          <div className={`${styles.flame} ${styles.ft6}`} />
+          <div className={`${styles.flame} ${styles.ft7}`} />
+          <div className={styles.fCore} />
+          <div className={`${styles.wisp} ${styles.wisp1}`} />
+          <div className={`${styles.wisp} ${styles.wisp2}`} />
+          <div className={`${styles.wisp} ${styles.wisp3}`} />
         </div>
 
       </div>
