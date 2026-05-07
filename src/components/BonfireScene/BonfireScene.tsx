@@ -148,22 +148,31 @@ export function BonfireScene() {
   );
 
   // === init silhouettes synced with onlineCount ===
+  // 인덱스 0은 항상 "나" — myNick으로 고정해서 내 메시지가 일관된 자리에서 떠오름
   useEffect(() => {
     const targetCount = Math.min(onlineCount, VISUAL_MAX_SILHOUETTES);
     setSilhouettes((prev) => {
+      const ensureMine = (arr: SilhouetteEntity[]): SilhouetteEntity[] =>
+        arr.length > 0 && arr[0].nick !== myNick
+          ? [{ ...arr[0], nick: myNick }, ...arr.slice(1)]
+          : arr;
       if (prev.length === targetCount) {
-        return prev.map((s, i) => ({ ...s, ...layoutPos(i, targetCount) }));
+        return ensureMine(prev.map((s, i) => ({ ...s, ...layoutPos(i, targetCount) })));
       }
       if (prev.length < targetCount) {
         const additions: SilhouetteEntity[] = [];
         for (let i = prev.length; i < targetCount; i++) {
           additions.push(makeSilhouetteEntity(i));
         }
-        return [...prev, ...additions].map((s, i) => ({ ...s, ...layoutPos(i, targetCount) }));
+        return ensureMine(
+          [...prev, ...additions].map((s, i) => ({ ...s, ...layoutPos(i, targetCount) })),
+        );
       }
-      return prev.slice(0, targetCount).map((s, i) => ({ ...s, ...layoutPos(i, targetCount) }));
+      return ensureMine(
+        prev.slice(0, targetCount).map((s, i) => ({ ...s, ...layoutPos(i, targetCount) })),
+      );
     });
-  }, [onlineCount]);
+  }, [onlineCount, myNick]);
 
   // === fake online drift ===
   useEffect(() => {
@@ -180,7 +189,9 @@ export function BonfireScene() {
     const tickFn = () => {
       if (cancelled) return;
       const text = FAKE_MESSAGES[Math.floor(Math.random() * FAKE_MESSAGES.length)];
-      const sIdx = silhouettes.length ? Math.floor(Math.random() * silhouettes.length) : -1;
+      // 인덱스 0은 "나" 자리 — 가짜 트래픽은 1번부터 픽
+      const others = silhouettes.length - 1;
+      const sIdx = others > 0 ? 1 + Math.floor(Math.random() * others) : -1;
       const nick = sIdx >= 0 ? silhouettes[sIdx].nick : makeNickname();
       pushMessageFromCrowd({ text, nick, sIdx });
       const delay = 2400 + Math.random() * 4000;
@@ -343,8 +354,8 @@ export function BonfireScene() {
       if (!text) return;
       setDraftMessage('');
       const id = messageIdRef.current++;
-      // 내 메시지도 임의의 사람 한 명에서 풍선 떠오르게 — 군중 속 한 사람 느낌
-      const sIdx = silhouettes.length ? Math.floor(Math.random() * silhouettes.length) : -1;
+      // 내 메시지는 인덱스 0번 (= 내 실루엣) 위에서 떠오름
+      const sIdx = silhouettes.length > 0 ? 0 : -1;
       const msg: ChatMessage = {
         id,
         text,
