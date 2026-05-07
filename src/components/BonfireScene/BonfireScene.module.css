@@ -562,7 +562,6 @@
   gap: 14px;
   max-height: calc(100vh - 280px);
   overflow: hidden;
-  mask-image: linear-gradient(180deg, transparent 0%, black 14%, black 72%, transparent 100%);
   text-align: right;
 }
 .feedHeader {
