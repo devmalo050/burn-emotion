@@ -1,28 +1,17 @@
+// 하늘과 땅 사이에 보이는 horizon 띠를 없애기 위해 — 단단한 wave-path 대신
+// 부드럽게 fade되는 그라데이션 한 장으로 깔아 시각적 seam 제거.
 export function NightField() {
   return (
-    <svg
-      preserveAspectRatio="none"
-      viewBox="0 0 100 30"
+    <div
       style={{
         position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: 0,
-        width: '100%',
-        height: '30%',
+        inset: 0,
         pointerEvents: 'none',
         zIndex: 1,
+        background:
+          'linear-gradient(180deg, transparent 0%, transparent 55%, rgba(15, 8, 4, 0.45) 80%, rgba(8, 4, 2, 0.85) 100%)',
         userSelect: 'none',
       }}
-    >
-      <defs>
-        <linearGradient id="fieldGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#2a1a18" />
-          <stop offset="40%" stopColor="#15100a" />
-          <stop offset="100%" stopColor="#080403" />
-        </linearGradient>
-      </defs>
-      <path d="M 0 4 Q 30 2 50 5 Q 70 7 100 4 L 100 30 L 0 30 Z" fill="url(#fieldGrad)" />
-    </svg>
+    />
   );
 }
