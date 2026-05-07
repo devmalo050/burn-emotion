@@ -5,20 +5,21 @@ describe('makeNickname', () => {
   it('returns Korean nickname when random < 0.65', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const nick = makeNickname();
-    expect(nick).toMatch(/^[가-힣 ]+_[가-힣 ]+_\d{2}$/);
+    expect(nick).toMatch(/^[가-힣]+(?: [가-힣]+)? [가-힣]+(?: [가-힣]+)?$/);
     vi.restoreAllMocks();
   });
 
   it('returns English nickname when random >= 0.65', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
     const nick = makeNickname();
-    expect(nick).toMatch(/^[a-z]+-[a-z]+-\d{2}$/);
+    expect(nick).toMatch(/^[a-z]+ [a-z]+$/);
     vi.restoreAllMocks();
   });
 
-  it('zero-pads number to 2 digits', () => {
-    const nick = makeNickname();
-    const num = nick.match(/(\d{2})$/)?.[1];
-    expect(num?.length).toBe(2);
+  it('does not contain digits', () => {
+    for (let i = 0; i < 50; i++) {
+      const nick = makeNickname();
+      expect(nick).not.toMatch(/\d/);
+    }
   });
 });

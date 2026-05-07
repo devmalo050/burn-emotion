@@ -21,11 +21,10 @@ const NOUN_EN = [
 ] as const;
 
 const pick = <T>(arr: readonly T[]): T => arr[Math.floor(Math.random() * arr.length)];
-const pad2 = (n: number) => String(n).padStart(2, '0');
 
 export function makeNickname(): string {
   if (Math.random() >= 0.65) {
-    return `${pick(ADJ_EN)}-${pick(NOUN_EN)}-${pad2(Math.floor(Math.random() * 99))}`;
+    return `${pick(ADJ_EN)} ${pick(NOUN_EN)}`;
   }
-  return `${pick(ADJ_KR)}_${pick(NOUN_KR)}_${pad2(Math.floor(Math.random() * 99))}`;
+  return `${pick(ADJ_KR)} ${pick(NOUN_KR)}`;
 }

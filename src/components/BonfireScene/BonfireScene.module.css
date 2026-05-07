@@ -563,9 +563,6 @@
   max-height: calc(100vh - 280px);
   overflow: hidden;
   text-align: right;
-  /* 위/아래 끝만 살짝 fade — 메시지 본체는 가리지 않음 */
-  mask-image: linear-gradient(180deg, transparent 0%, black 4%, black 96%, transparent 100%);
-  -webkit-mask-image: linear-gradient(180deg, transparent 0%, black 4%, black 96%, transparent 100%);
 }
 .feedHeader {
   font-family: var(--font-kr);
