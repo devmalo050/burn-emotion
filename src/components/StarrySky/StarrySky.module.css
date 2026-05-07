@@ -1,0 +1,45 @@
+.starrySky {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 60%;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+  user-select: none;
+}
+.skyGrad {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 90% 70% at 50% 110%, #2a1a1c 0%, #1a1126 35%, #0c0a1f 70%, #050416 100%);
+}
+.moon {
+  position: absolute;
+  right: 14%;
+  top: 16%;
+  width: 18px;
+  height: 18px;
+  background: radial-gradient(circle, #fff5d8 0%, #f5e4b0 60%, #d8c280 100%);
+  border-radius: 50%;
+  box-shadow: 0 0 1px rgba(0, 0, 0, 0.2) inset;
+}
+.moonGlow {
+  position: absolute;
+  right: calc(14% - 30px);
+  top: calc(16% - 30px);
+  width: 78px;
+  height: 78px;
+  background: radial-gradient(circle, rgba(255, 245, 210, 0.18) 0%, transparent 65%);
+  border-radius: 50%;
+}
+.starDot {
+  position: absolute;
+  background: #fff5e8;
+  border-radius: 50%;
+  box-shadow: 0 0 2px rgba(255, 245, 220, 0.6);
+}
+.blink {
+  animation-name: starBlink;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
