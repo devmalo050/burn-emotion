@@ -115,8 +115,23 @@ export function BonfireScene() {
   const emberIdRef = useRef(1);
   // 실시간 채널 (broadcast + presence)
   const channelRef = useRef<RealtimeChannel | null>(null);
-  // presence sync 결과로 받은 다른 접속자 닉 목록
-  const [peers, setPeers] = useState<Array<{ nick: string; key: string }>>([]);
+  // 내 자리 정보 (mount 시 한 번만 정해서 presence로 공유)
+  const mySpotRef = useRef<{
+    x: number;
+    y: number;
+    scale: number;
+    flip: boolean;
+    variant: number;
+    joinedAt: number;
+  } | null>(null);
+  if (mySpotRef.current === null) {
+    const spot = randomSpot();
+    mySpotRef.current = {
+      ...spot,
+      variant: Math.floor(Math.random() * 5),
+      joinedAt: Date.now(),
+    };
+  }
 
   // === spawn potato AT the fire — stable slot so existing potatoes
   // don't reshuffle. At max capacity, only replace an already-cracked
@@ -198,10 +213,11 @@ export function BonfireScene() {
     [spawnPotatoAtFire],
   );
 
-  // === init silhouettes synced with onlineCount ===
-  // 각 entity가 자체 랜덤 자리를 가지고 있어서 매 세션 배치가 다름.
-  // 첫 마운트 때 랜덤한 인덱스가 "나" 자리로 정해지고 그 자리의 닉을 myNick으로 강제.
+  // === init silhouettes (가짜 트래픽 / 단독 모드 전용) ===
+  // 실제 multi-user 모드(supabase + fake off)에서는 presence sync가 silhouettes를 만든다.
+  // 그 외에는 onlineCount만큼 로컬 랜덤 silhouette을 채움.
   useEffect(() => {
+    if (!showFakeTraffic && isSupabaseConfigured()) return;
     const targetCount = Math.min(onlineCount, VISUAL_MAX_SILHOUETTES);
     setSilhouettes((prev) => {
       let mineIdx = mySilhouetteIdx;
@@ -228,54 +244,84 @@ export function BonfireScene() {
       }
       return ensureMine(prev.slice(0, targetCount));
     });
-  }, [onlineCount, myNick, mySilhouetteIdx]);
+  }, [onlineCount, myNick, mySilhouetteIdx, showFakeTraffic]);
 
   // ref 동기화 — 토글 OFF 후에도 진행 중인 setTimeout에서 최신값 읽기 위함
   useEffect(() => {
     fakeTrafficRef.current = showFakeTraffic;
   }, [showFakeTraffic]);
 
-  // === Supabase Realtime: broadcast (메시지) + presence (접속자) ===
-  // Supabase가 설정 안 됐거나 가짜 트래픽 ON이면 비활성화. 실제 멀티유저 모드일 때만.
+  // === Supabase Realtime: broadcast (메시지) + presence (접속자/실루엣) ===
+  // 실제 멀티유저 모드일 때만. presence가 silhouettes 의 source of truth.
   useEffect(() => {
     if (showFakeTraffic) return;
     if (!isSupabaseConfigured()) return;
     const supabase = getSupabase();
-    if (!supabase) return;
+    if (!supabase || !mySpotRef.current) return;
 
     const channel = supabase.channel('campfire-room', {
       config: { presence: { key: myNick } },
     });
     channelRef.current = channel;
 
+    type PresenceMeta = {
+      nick: string;
+      x: number;
+      y: number;
+      scale: number;
+      flip: boolean;
+      variant: number;
+      joinedAt: number;
+    };
+
     channel
-      // 다른 사람이 보낸 메시지 받기
       .on('broadcast', { event: 'msg' }, (payload) => {
         const data = payload.payload as { nick: string; text: string };
         if (!data?.nick || !data?.text) return;
-        // 본인 보낸 거는 echo 무시 (submit 쪽에서 이미 처리)
-        if (data.nick === myNick) return;
-        // 어느 silhouette에서 떠오르게 할지 — 닉네임으로 silhouettes에서 매칭, 없으면 -1
-        pushMessageFromCrowd({
-          text: data.text,
-          nick: data.nick,
-          sIdx: -1, // sIdx 매칭은 다음 단계에서 presence와 silhouettes 묶어 구현
+        if (data.nick === myNick) return; // 본인 echo 무시
+        // 현재 silhouettes에서 닉 매칭해서 sIdx 찾기 (못 찾으면 -1, feed에만 노출)
+        setSilhouettes((sList) => {
+          const sIdx = sList.findIndex((s) => s.nick === data.nick);
+          pushMessageFromCrowd({ text: data.text, nick: data.nick, sIdx });
+          return sList;
         });
       })
-      // 접속자 동기화
       .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState<{ nick: string }>();
-        const list: Array<{ nick: string; key: string }> = [];
+        const state = channel.presenceState<PresenceMeta>();
+        // joinedAt 기준 안정 정렬 — 누가 들어오고 나가도 기존 사람들 자리 안 바뀜
+        const peerList: PresenceMeta[] = [];
         for (const key in state) {
           const meta = state[key]?.[0];
-          if (meta?.nick) list.push({ nick: meta.nick, key });
+          if (meta?.nick) peerList.push(meta);
         }
-        setPeers(list);
-        setOnlineCount(list.length || 1);
+        peerList.sort((a, b) => a.joinedAt - b.joinedAt);
+
+        const newSilhouettes: SilhouetteEntity[] = peerList.map((p) => ({
+          id: 'peer-' + p.nick,
+          nick: p.nick,
+          x: p.x,
+          y: p.y,
+          scale: p.scale,
+          variant: p.variant,
+          flip: p.flip,
+        }));
+        setSilhouettes(newSilhouettes);
+        setOnlineCount(newSilhouettes.length || 1);
+        // 내 인덱스 갱신
+        const myIdx = newSilhouettes.findIndex((s) => s.nick === myNick);
+        setMySilhouetteIdx(myIdx >= 0 ? myIdx : null);
       })
       .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await channel.track({ nick: myNick, joinedAt: Date.now() });
+        if (status === 'SUBSCRIBED' && mySpotRef.current) {
+          await channel.track({
+            nick: myNick,
+            x: mySpotRef.current.x,
+            y: mySpotRef.current.y,
+            scale: mySpotRef.current.scale,
+            flip: mySpotRef.current.flip,
+            variant: mySpotRef.current.variant,
+            joinedAt: mySpotRef.current.joinedAt,
+          });
         }
       });
 
