@@ -341,7 +341,17 @@ export function BonfireScene() {
         }
       });
 
+    // 탭 닫기/숨김 시 즉시 leave broadcast — 서버 timeout(~30s) 기다리지 않게
+    const onLeave = () => {
+      void channel.untrack();
+      void supabase.removeChannel(channel);
+    };
+    window.addEventListener('pagehide', onLeave);
+    window.addEventListener('beforeunload', onLeave);
+
     return () => {
+      window.removeEventListener('pagehide', onLeave);
+      window.removeEventListener('beforeunload', onLeave);
       channelRef.current = null;
       void supabase.removeChannel(channel);
     };
