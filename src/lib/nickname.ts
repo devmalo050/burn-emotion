@@ -20,31 +20,8 @@ const NOUN_KR = [
   '책상', '편지', '담요',
 ] as const;
 
-const ADJ_EN = [
-  'tired', 'blue', 'muffled', 'quiet', 'lonely', 'soggy', 'scattered', 'bent',
-  'hollow', 'slow', 'fading', 'creaky', 'dim', 'torn', 'wobbly', 'still', 'tangled',
-  'silent', 'foggy', 'weary', 'gray', 'drifting', 'hushed', 'faint', 'broken',
-  'brittle', 'gentle', 'distant', 'lost', 'sleepy', 'dusky', 'vague', 'flickering',
-  'frayed', 'restless', 'pale', 'fragile', 'weathered', 'dusty', 'salty', 'frozen',
-  'melting', 'drowsy', 'husky', 'tender', 'lukewarm', 'lingering', 'languid',
-  'sullen', 'rusty',
-] as const;
-
-const NOUN_EN = [
-  'cloud', 'snail', 'lamp', 'kettle', 'envelope', 'wave', 'sweater', 'fog',
-  'bulb', 'note', 'ribbon', 'tape', 'sock', 'jar', 'ticket', 'page',
-  'postcard', 'blanket', 'button', 'mirror', 'kite', 'candle', 'mug', 'bottle',
-  'drawer', 'scarf', 'stamp', 'balloon', 'raft', 'tin', 'marble', 'fern', 'dial',
-  'key', 'piano', 'photograph', 'telegram', 'pebble', 'paperclip', 'locket',
-  'satchel', 'slipper', 'spool', 'harbor', 'cellar', 'freckle', 'whisper',
-  'lantern', 'pillow', 'shawl',
-] as const;
-
 const pick = <T>(arr: readonly T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
 export function makeNickname(): string {
-  if (Math.random() >= 0.65) {
-    return `${pick(ADJ_EN)} ${pick(NOUN_EN)}`;
-  }
   return `${pick(ADJ_KR)} ${pick(NOUN_KR)}`;
 }
