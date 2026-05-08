@@ -178,8 +178,21 @@ export function BonfireScene() {
   }, []);
 
   // === messages from crowd ===
+  // isFake: 가짜 트래픽 stream에서 호출됐을 때만 true. 토글 OFF로 꺼지는 사이
+  // in-flight으로 떠 있던 spawn timer가 마저 발사되는 race를 막기 위함.
+  // 진짜 broadcast 메시지(isFake=false)는 게이트 없이 항상 spawn.
   const pushMessageFromCrowd = useCallback(
-    ({ text, nick, sIdx }: { text: string; nick: string; sIdx: number }) => {
+    ({
+      text,
+      nick,
+      sIdx,
+      isFake = false,
+    }: {
+      text: string;
+      nick: string;
+      sIdx: number;
+      isFake?: boolean;
+    }) => {
       const id = messageIdRef.current++;
       const msg: ChatMessage = { id, text, nick, sIdx, time: Date.now(), isMe: false };
 
@@ -199,9 +212,9 @@ export function BonfireScene() {
       }
 
       setFeedMessages((prev) => [msg, ...prev].slice(0, 7));
-      // 가짜 트래픽 토글이 꺼지면 spawn 안 되게 ref 게이트
       setTimeout(() => {
-        if (!fakeTrafficRef.current) return;
+        // 가짜 트래픽이었던 메시지는 토글 OFF로 꺼지면 spawn 차단
+        if (isFake && !fakeTrafficRef.current) return;
         spawnPotatoAtFire(msg);
       }, 1500 + Math.random() * 1200);
       setTimeout(() => {
@@ -365,7 +378,7 @@ export function BonfireScene() {
         } while (sIdx === mySilhouetteIdx);
       }
       const nick = sIdx >= 0 ? silhouettes[sIdx].nick : makeNickname();
-      pushMessageFromCrowd({ text, nick, sIdx });
+      pushMessageFromCrowd({ text, nick, sIdx, isFake: true });
       const delay = 2400 + Math.random() * 4000;
       timer = setTimeout(tickFn, delay);
     };
