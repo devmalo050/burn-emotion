@@ -115,6 +115,8 @@ export function BonfireScene() {
   const emberIdRef = useRef(1);
   // 실시간 채널 (broadcast + presence)
   const channelRef = useRef<RealtimeChannel | null>(null);
+  // setSilhouettes updater 안에서 부작용 호출 시 StrictMode가 두 번 호출하는 문제 방지용
+  const silhouettesRef = useRef<SilhouetteEntity[]>([]);
   // 내 자리 정보 (mount 시 한 번만 정해서 presence로 공유)
   const mySpotRef = useRef<{
     x: number;
@@ -250,6 +252,9 @@ export function BonfireScene() {
   useEffect(() => {
     fakeTrafficRef.current = showFakeTraffic;
   }, [showFakeTraffic]);
+  useEffect(() => {
+    silhouettesRef.current = silhouettes;
+  }, [silhouettes]);
 
   // === Supabase Realtime: broadcast (메시지) + presence (접속자/실루엣) ===
   // 실제 멀티유저 모드일 때만. presence가 silhouettes 의 source of truth.
@@ -279,12 +284,10 @@ export function BonfireScene() {
         const data = payload.payload as { nick: string; text: string };
         if (!data?.nick || !data?.text) return;
         if (data.nick === myNick) return; // 본인 echo 무시
-        // 현재 silhouettes에서 닉 매칭해서 sIdx 찾기 (못 찾으면 -1, feed에만 노출)
-        setSilhouettes((sList) => {
-          const sIdx = sList.findIndex((s) => s.nick === data.nick);
-          pushMessageFromCrowd({ text: data.text, nick: data.nick, sIdx });
-          return sList;
-        });
+        // ref로 현재 silhouettes 읽기 (setter 콜백 안에서 부작용 호출하면 StrictMode가 두 번 발사)
+        const sList = silhouettesRef.current;
+        const sIdx = sList.findIndex((s) => s.nick === data.nick);
+        pushMessageFromCrowd({ text: data.text, nick: data.nick, sIdx });
       })
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState<PresenceMeta>();
