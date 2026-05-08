@@ -524,9 +524,7 @@ export function BonfireScene() {
       e?.preventDefault?.();
       const text = draftMessage.trim();
       if (!text) return;
-      // === 도배 방지 ===
-      // 1) 똑같은 메시지 연달아 — 막음
-      // 2) 5초 내에 5번 이상 — 막음
+      // === 도배 방지 — 같은 말 연달아만 막음 ===
       const now = Date.now();
       const last = lastSentRef.current;
       if (text === last.text && now - last.at < 5000) {
@@ -534,13 +532,7 @@ export function BonfireScene() {
         setTimeout(() => setThrottleNotice(null), 2200);
         return;
       }
-      const recent = last.recent.filter((t) => now - t < 5000);
-      if (recent.length >= 5) {
-        setThrottleNotice('너무 빨리 던지고 있어요. 잠깐 숨 고르기');
-        setTimeout(() => setThrottleNotice(null), 2200);
-        return;
-      }
-      lastSentRef.current = { text, at: now, recent: [...recent, now] };
+      lastSentRef.current = { text, at: now, recent: [] };
       setDraftMessage('');
       const id = messageIdRef.current++;
       // 내 메시지는 mySilhouetteIdx (= 내 실루엣) 위에서 떠오름
