@@ -10,7 +10,6 @@ import { PLACEHOLDER_LINES } from '@/lib/data/placeholder-lines';
 import { FAKE_MESSAGES } from '@/lib/data/fake-messages';
 import { COMFORT_LINES, type ComfortLine } from '@/lib/data/comfort-lines';
 import { AudioEngine } from '@/lib/audio/audio-engine';
-import { layoutPos } from '@/lib/layout/silhouette-layout';
 import type {
   ChatMessage,
   PotatoState,
@@ -36,15 +35,44 @@ const POTATO_SLOTS: ReadonlyArray<{ x: number; y: number; z: number; s: number; 
   { x: -2, y: 10, z: 3, s: 1.05, r: 0 },
 ];
 
+// 모닥불 주위 랜덤 자리 — 정해진 호 대신 매 세션 다른 위치.
+// 정중앙 앞 (불을 가리는 zone) 만 비우고, 좌우/뒤로 자연스럽게 흩어짐.
+function randomSpot(): { x: number; y: number; scale: number; flip: boolean } {
+  const isFront = Math.random() < 0.3;
+  let theta: number;
+  let radius: number;
+  let y: number;
+  let scale: number;
+  if (isFront) {
+    // 앞쪽 좌우 (정중앙은 피함)
+    const isLeft = Math.random() < 0.5;
+    theta = isLeft
+      ? ((200 + Math.random() * 50) * Math.PI) / 180 // 200-250°
+      : ((290 + Math.random() * 50) * Math.PI) / 180; // 290-340°
+    radius = 28 + Math.random() * 10;
+    y = 22 + Math.random() * 28;
+    scale = 0.78 + Math.random() * 0.12;
+  } else {
+    // 뒤쪽 호 — 모닥불 너머
+    theta = ((20 + Math.random() * 140) * Math.PI) / 180; // 20-160°
+    radius = 36 + Math.random() * 12;
+    y = 78 + Math.random() * 50;
+    scale = 0.48 + Math.sin(theta) * 0.18 + Math.random() * 0.06;
+  }
+  const x = 50 + Math.cos(theta) * radius;
+  return { x, y, scale, flip: x > 50 };
+}
+
 function makeSilhouetteEntity(i: number): SilhouetteEntity {
+  const spot = randomSpot();
   return {
     id: 'sil-' + i + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
     nick: makeNickname(),
-    x: 0,
-    y: 0,
-    scale: 0,
-    variant: 0,
-    flip: false,
+    x: spot.x,
+    y: spot.y,
+    scale: spot.scale,
+    variant: Math.floor(Math.random() * 5),
+    flip: spot.flip,
   };
 }
 
@@ -165,7 +193,8 @@ export function BonfireScene() {
   );
 
   // === init silhouettes synced with onlineCount ===
-  // 첫 마운트 때 랜덤한 인덱스가 "나" 자리로 정해지고, 그 자리의 닉이 myNick으로 고정.
+  // 각 entity가 자체 랜덤 자리를 가지고 있어서 매 세션 배치가 다름.
+  // 첫 마운트 때 랜덤한 인덱스가 "나" 자리로 정해지고 그 자리의 닉을 myNick으로 강제.
   useEffect(() => {
     const targetCount = Math.min(onlineCount, VISUAL_MAX_SILHOUETTES);
     setSilhouettes((prev) => {
@@ -175,7 +204,6 @@ export function BonfireScene() {
         setMySilhouetteIdx(mineIdx);
       }
       if (mineIdx !== null && mineIdx >= targetCount) {
-        // 접속자 수가 줄어 내 자리가 사라지면 마지막 자리로 클램프
         mineIdx = targetCount - 1;
         setMySilhouetteIdx(mineIdx);
       }
@@ -184,21 +212,15 @@ export function BonfireScene() {
         if (arr[mineIdx].nick === myNick) return arr;
         return arr.map((s, i) => (i === mineIdx ? { ...s, nick: myNick } : s));
       };
-      if (prev.length === targetCount) {
-        return ensureMine(prev.map((s, i) => ({ ...s, ...layoutPos(i, targetCount) })));
-      }
+      if (prev.length === targetCount) return ensureMine(prev);
       if (prev.length < targetCount) {
         const additions: SilhouetteEntity[] = [];
         for (let i = prev.length; i < targetCount; i++) {
           additions.push(makeSilhouetteEntity(i));
         }
-        return ensureMine(
-          [...prev, ...additions].map((s, i) => ({ ...s, ...layoutPos(i, targetCount) })),
-        );
+        return ensureMine([...prev, ...additions]);
       }
-      return ensureMine(
-        prev.slice(0, targetCount).map((s, i) => ({ ...s, ...layoutPos(i, targetCount) })),
-      );
+      return ensureMine(prev.slice(0, targetCount));
     });
   }, [onlineCount, myNick, mySilhouetteIdx]);
 
