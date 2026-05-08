@@ -65,6 +65,8 @@ export function BonfireScene() {
   const [silhouettes, setSilhouettes] = useState<SilhouetteEntity[]>([]);
   const [activeBubbles, setActiveBubbles] = useState<Record<number, ActiveBubble>>({});
   const [pile, setPile] = useState<PotatoState[]>([]);
+  // 내 자리 인덱스 — 세션 시작 후 첫 silhouettes 생성 시 랜덤 선택해서 고정
+  const [mySilhouetteIdx, setMySilhouetteIdx] = useState<number | null>(null);
 
   const fireRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -163,14 +165,25 @@ export function BonfireScene() {
   );
 
   // === init silhouettes synced with onlineCount ===
-  // 인덱스 0은 항상 "나" — myNick으로 고정해서 내 메시지가 일관된 자리에서 떠오름
+  // 첫 마운트 때 랜덤한 인덱스가 "나" 자리로 정해지고, 그 자리의 닉이 myNick으로 고정.
   useEffect(() => {
     const targetCount = Math.min(onlineCount, VISUAL_MAX_SILHOUETTES);
     setSilhouettes((prev) => {
-      const ensureMine = (arr: SilhouetteEntity[]): SilhouetteEntity[] =>
-        arr.length > 0 && arr[0].nick !== myNick
-          ? [{ ...arr[0], nick: myNick }, ...arr.slice(1)]
-          : arr;
+      let mineIdx = mySilhouetteIdx;
+      if (mineIdx === null && targetCount > 0) {
+        mineIdx = Math.floor(Math.random() * targetCount);
+        setMySilhouetteIdx(mineIdx);
+      }
+      if (mineIdx !== null && mineIdx >= targetCount) {
+        // 접속자 수가 줄어 내 자리가 사라지면 마지막 자리로 클램프
+        mineIdx = targetCount - 1;
+        setMySilhouetteIdx(mineIdx);
+      }
+      const ensureMine = (arr: SilhouetteEntity[]): SilhouetteEntity[] => {
+        if (mineIdx === null || arr.length === 0) return arr;
+        if (arr[mineIdx].nick === myNick) return arr;
+        return arr.map((s, i) => (i === mineIdx ? { ...s, nick: myNick } : s));
+      };
       if (prev.length === targetCount) {
         return ensureMine(prev.map((s, i) => ({ ...s, ...layoutPos(i, targetCount) })));
       }
@@ -187,7 +200,7 @@ export function BonfireScene() {
         prev.slice(0, targetCount).map((s, i) => ({ ...s, ...layoutPos(i, targetCount) })),
       );
     });
-  }, [onlineCount, myNick]);
+  }, [onlineCount, myNick, mySilhouetteIdx]);
 
   // ref 동기화 — 토글 OFF 후에도 진행 중인 setTimeout에서 최신값 읽기 위함
   useEffect(() => {
@@ -215,9 +228,13 @@ export function BonfireScene() {
     const tickFn = () => {
       if (cancelled) return;
       const text = FAKE_MESSAGES[Math.floor(Math.random() * FAKE_MESSAGES.length)];
-      // 인덱스 0은 "나" 자리 — 가짜 트래픽은 1번부터 픽
-      const others = silhouettes.length - 1;
-      const sIdx = others > 0 ? 1 + Math.floor(Math.random() * others) : -1;
+      // 가짜 트래픽은 "나" 자리는 빼고 픽
+      let sIdx = -1;
+      if (silhouettes.length > 1) {
+        do {
+          sIdx = Math.floor(Math.random() * silhouettes.length);
+        } while (sIdx === mySilhouetteIdx);
+      }
       const nick = sIdx >= 0 ? silhouettes[sIdx].nick : makeNickname();
       pushMessageFromCrowd({ text, nick, sIdx });
       const delay = 2400 + Math.random() * 4000;
@@ -228,7 +245,7 @@ export function BonfireScene() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [showFakeTraffic, silhouettes, pushMessageFromCrowd]);
+  }, [showFakeTraffic, silhouettes, mySilhouetteIdx, pushMessageFromCrowd]);
 
   // === comfort drift — 하늘에 위로 문구 천천히 떠올랐다 사라짐 ===
   useEffect(() => {
@@ -397,8 +414,9 @@ export function BonfireScene() {
       lastSentRef.current = { text, at: now, recent: [...recent, now] };
       setDraftMessage('');
       const id = messageIdRef.current++;
-      // 내 메시지는 인덱스 0번 (= 내 실루엣) 위에서 떠오름
-      const sIdx = silhouettes.length > 0 ? 0 : -1;
+      // 내 메시지는 mySilhouetteIdx (= 내 실루엣) 위에서 떠오름
+      const sIdx =
+        mySilhouetteIdx !== null && mySilhouetteIdx < silhouettes.length ? mySilhouetteIdx : -1;
       const msg: ChatMessage = {
         id,
         text,
@@ -431,7 +449,7 @@ export function BonfireScene() {
         );
       }, 6500);
     },
-    [draftMessage, myNick, silhouettes, spawnPotatoAtFire],
+    [draftMessage, myNick, silhouettes, mySilhouetteIdx, spawnPotatoAtFire],
   );
 
   const fireIntensity = Math.min(1.5, 0.85 + pile.length * 0.04);
