@@ -309,12 +309,20 @@ export function BonfireScene() {
       const state = channel.presenceState<PresenceMeta>();
       const now = Date.now();
       const peerList: PresenceMeta[] = [];
+      const mySessionKey = sessionIdRef.current;
       for (const key in state) {
-        const meta = state[key]?.[0];
+        const arr = state[key];
+        if (!arr || arr.length === 0) continue;
+        // track() 여러 번 호출하면 array에 누적되니 lastSeen 가장 최신 entry 사용
+        let meta = arr[0];
+        for (const m of arr) {
+          if ((m?.lastSeen ?? 0) > (meta?.lastSeen ?? 0)) meta = m;
+        }
         if (!meta?.nick) continue;
-        // lastSeen 없으면 joinedAt fallback
+        // 본인 세션은 무조건 포함 (heartbeat 갱신이 아직 안 보일 수도 있음)
+        const isMe = key === mySessionKey;
         const last = meta.lastSeen ?? meta.joinedAt ?? now;
-        if (now - last > STALE_AFTER_MS) continue;
+        if (!isMe && now - last > STALE_AFTER_MS) continue;
         peerList.push(meta);
       }
       peerList.sort((a, b) => a.joinedAt - b.joinedAt);
