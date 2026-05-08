@@ -10,6 +10,8 @@ import { PLACEHOLDER_LINES } from '@/lib/data/placeholder-lines';
 import { FAKE_MESSAGES } from '@/lib/data/fake-messages';
 import { COMFORT_LINES, type ComfortLine } from '@/lib/data/comfort-lines';
 import { AudioEngine } from '@/lib/audio/audio-engine';
+import { getSupabase, isSupabaseConfigured } from '@/lib/supabase/client';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import type {
   ChatMessage,
   PotatoState,
@@ -111,6 +113,10 @@ export function BonfireScene() {
   const messageIdRef = useRef(1);
   const potatoIdRef = useRef(1);
   const emberIdRef = useRef(1);
+  // 실시간 채널 (broadcast + presence)
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  // presence sync 결과로 받은 다른 접속자 닉 목록
+  const [peers, setPeers] = useState<Array<{ nick: string; key: string }>>([]);
 
   // === spawn potato AT the fire — stable slot so existing potatoes
   // don't reshuffle. At max capacity, only replace an already-cracked
@@ -229,10 +235,62 @@ export function BonfireScene() {
     fakeTrafficRef.current = showFakeTraffic;
   }, [showFakeTraffic]);
 
+  // === Supabase Realtime: broadcast (메시지) + presence (접속자) ===
+  // Supabase가 설정 안 됐거나 가짜 트래픽 ON이면 비활성화. 실제 멀티유저 모드일 때만.
+  useEffect(() => {
+    if (showFakeTraffic) return;
+    if (!isSupabaseConfigured()) return;
+    const supabase = getSupabase();
+    if (!supabase) return;
+
+    const channel = supabase.channel('campfire-room', {
+      config: { presence: { key: myNick } },
+    });
+    channelRef.current = channel;
+
+    channel
+      // 다른 사람이 보낸 메시지 받기
+      .on('broadcast', { event: 'msg' }, (payload) => {
+        const data = payload.payload as { nick: string; text: string };
+        if (!data?.nick || !data?.text) return;
+        // 본인 보낸 거는 echo 무시 (submit 쪽에서 이미 처리)
+        if (data.nick === myNick) return;
+        // 어느 silhouette에서 떠오르게 할지 — 닉네임으로 silhouettes에서 매칭, 없으면 -1
+        pushMessageFromCrowd({
+          text: data.text,
+          nick: data.nick,
+          sIdx: -1, // sIdx 매칭은 다음 단계에서 presence와 silhouettes 묶어 구현
+        });
+      })
+      // 접속자 동기화
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState<{ nick: string }>();
+        const list: Array<{ nick: string; key: string }> = [];
+        for (const key in state) {
+          const meta = state[key]?.[0];
+          if (meta?.nick) list.push({ nick: meta.nick, key });
+        }
+        setPeers(list);
+        setOnlineCount(list.length || 1);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({ nick: myNick, joinedAt: Date.now() });
+        }
+      });
+
+    return () => {
+      channelRef.current = null;
+      void supabase.removeChannel(channel);
+    };
+  }, [showFakeTraffic, myNick, pushMessageFromCrowd]);
+
   // === fake online drift — 토글 ON일 때만 ===
+  // (Supabase presence가 활성화되면 그쪽이 onlineCount를 덮어씀)
   useEffect(() => {
     if (!showFakeTraffic) {
-      setOnlineCount(1);
+      // Supabase 안 붙은 경우에만 1로 리셋. 붙어있으면 presence가 관리.
+      if (!isSupabaseConfigured()) setOnlineCount(1);
       return;
     }
     setOnlineCount((c) => (c < 8 ? 24 : c));
@@ -462,6 +520,14 @@ export function BonfireScene() {
         }, 3000);
       }
       setFeedMessages((prev) => [{ ...msg, nick: msg.nick + ' (나)' }, ...prev].slice(0, 7));
+      // 다른 접속자들에게 broadcast (Supabase 채널 연결되어 있을 때만)
+      if (channelRef.current) {
+        void channelRef.current.send({
+          type: 'broadcast',
+          event: 'msg',
+          payload: { nick: myNick, text },
+        });
+      }
       setTimeout(() => spawnPotatoAtFire(msg), 100);
       setTimeout(() => {
         setFeedMessages((prev) => prev.map((x) => (x.id === id ? { ...x, fading: true } : x)));

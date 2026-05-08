@@ -40,3 +40,5 @@ Claude Design 핸드오프 번들 `Emotional Trash Can v2`. 캠프파이어 + �
 ```bash
 npm test
 ```
+
+***REMOVED***
