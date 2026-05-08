@@ -299,43 +299,50 @@ export function BonfireScene() {
       flip: boolean;
       variant: number;
       joinedAt: number;
+      lastSeen: number;
+    };
+
+    // 살아있는 peer만 추리는 stale filter — heartbeat 끊긴 지 12s 넘으면 제외
+    const STALE_AFTER_MS = 12000;
+
+    const applyPeers = () => {
+      const state = channel.presenceState<PresenceMeta>();
+      const now = Date.now();
+      const peerList: PresenceMeta[] = [];
+      for (const key in state) {
+        const meta = state[key]?.[0];
+        if (!meta?.nick) continue;
+        // lastSeen 없으면 joinedAt fallback
+        const last = meta.lastSeen ?? meta.joinedAt ?? now;
+        if (now - last > STALE_AFTER_MS) continue;
+        peerList.push(meta);
+      }
+      peerList.sort((a, b) => a.joinedAt - b.joinedAt);
+      const newSilhouettes: SilhouetteEntity[] = peerList.map((p) => ({
+        id: 'peer-' + p.nick,
+        nick: p.nick,
+        x: p.x,
+        y: p.y,
+        scale: p.scale,
+        variant: p.variant,
+        flip: p.flip,
+      }));
+      setSilhouettes(newSilhouettes);
+      setOnlineCount(newSilhouettes.length || 1);
+      const myIdx = newSilhouettes.findIndex((s) => s.nick === myNick);
+      setMySilhouetteIdx(myIdx >= 0 ? myIdx : null);
     };
 
     channel
       .on('broadcast', { event: 'msg' }, (payload) => {
         const data = payload.payload as { nick: string; text: string };
         if (!data?.nick || !data?.text) return;
-        if (data.nick === myNick) return; // 본인 echo 무시
-        // ref로 현재 silhouettes 읽기 (setter 콜백 안에서 부작용 호출하면 StrictMode가 두 번 발사)
+        if (data.nick === myNick) return;
         const sList = silhouettesRef.current;
         const sIdx = sList.findIndex((s) => s.nick === data.nick);
         pushMessageFromCrowd({ text: data.text, nick: data.nick, sIdx });
       })
-      .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState<PresenceMeta>();
-        // joinedAt 기준 안정 정렬 — 누가 들어오고 나가도 기존 사람들 자리 안 바뀜
-        const peerList: PresenceMeta[] = [];
-        for (const key in state) {
-          const meta = state[key]?.[0];
-          if (meta?.nick) peerList.push(meta);
-        }
-        peerList.sort((a, b) => a.joinedAt - b.joinedAt);
-
-        const newSilhouettes: SilhouetteEntity[] = peerList.map((p) => ({
-          id: 'peer-' + p.nick,
-          nick: p.nick,
-          x: p.x,
-          y: p.y,
-          scale: p.scale,
-          variant: p.variant,
-          flip: p.flip,
-        }));
-        setSilhouettes(newSilhouettes);
-        setOnlineCount(newSilhouettes.length || 1);
-        // 내 인덱스 갱신
-        const myIdx = newSilhouettes.findIndex((s) => s.nick === myNick);
-        setMySilhouetteIdx(myIdx >= 0 ? myIdx : null);
-      })
+      .on('presence', { event: 'sync' }, applyPeers)
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED' && mySpotRef.current) {
           await channel.track({
@@ -346,11 +353,29 @@ export function BonfireScene() {
             flip: mySpotRef.current.flip,
             variant: mySpotRef.current.variant,
             joinedAt: mySpotRef.current.joinedAt,
+            lastSeen: Date.now(),
           });
         }
       });
 
-    // 탭 닫기/숨김 시 즉시 leave broadcast — 서버 timeout(~30s) 기다리지 않게
+    // heartbeat: 4s마다 lastSeen 갱신해서 다른 client에게 "나 살아있어" 알림
+    const heartbeat = setInterval(() => {
+      if (!mySpotRef.current) return;
+      void channel.track({
+        nick: myNick,
+        x: mySpotRef.current.x,
+        y: mySpotRef.current.y,
+        scale: mySpotRef.current.scale,
+        flip: mySpotRef.current.flip,
+        variant: mySpotRef.current.variant,
+        joinedAt: mySpotRef.current.joinedAt,
+        lastSeen: Date.now(),
+      });
+    }, 4000);
+
+    // stale 검사: 5s마다 stale peer 제거 (presence sync 안 와도 유령은 사라짐)
+    const stalePurge = setInterval(applyPeers, 5000);
+
     const onLeave = () => {
       void channel.untrack();
       void supabase.removeChannel(channel);
@@ -359,6 +384,8 @@ export function BonfireScene() {
     window.addEventListener('beforeunload', onLeave);
 
     return () => {
+      clearInterval(heartbeat);
+      clearInterval(stalePurge);
       window.removeEventListener('pagehide', onLeave);
       window.removeEventListener('beforeunload', onLeave);
       channelRef.current = null;
