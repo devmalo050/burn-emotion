@@ -7,7 +7,6 @@ import { StarrySky } from '@/components/StarrySky/StarrySky';
 import { NightField } from '@/components/NightField/NightField';
 import { makeNickname } from '@/lib/nickname';
 import { PLACEHOLDER_LINES } from '@/lib/data/placeholder-lines';
-import { FAKE_MESSAGES } from '@/lib/data/fake-messages';
 import { COMFORT_LINES, type ComfortLine } from '@/lib/data/comfort-lines';
 import { AudioEngine } from '@/lib/audio/audio-engine';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase/client';
@@ -25,7 +24,6 @@ const ROAST_DURATION_MS = 18000;
 const CRACK_DURATION_MS = 2400;
 const POKE_BOOST = 0.18;
 const MAX_POTATOES = 7;
-const VISUAL_MAX_SILHOUETTES = 30;
 
 const POTATO_SLOTS: ReadonlyArray<{ x: number; y: number; z: number; s: number; r: number }> = [
   { x: -48, y: 0, z: 1, s: 0.95, r: -68 },
@@ -65,19 +63,6 @@ function randomSpot(): { x: number; y: number; scale: number; flip: boolean } {
   return { x, y, scale, flip: x > 50 };
 }
 
-function makeSilhouetteEntity(i: number): SilhouetteEntity {
-  const spot = randomSpot();
-  return {
-    id: 'sil-' + i + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
-    nick: makeNickname(),
-    x: spot.x,
-    y: spot.y,
-    scale: spot.scale,
-    variant: Math.floor(Math.random() * 5),
-    flip: spot.flip,
-  };
-}
-
 export function BonfireScene() {
   const [feedMessages, setFeedMessages] = useState<ChatMessage[]>([]);
   const [comfortMsg, setComfortMsg] = useState<(ComfortLine & { key: number }) | null>(null);
@@ -86,7 +71,6 @@ export function BonfireScene() {
   const [muted, setMuted] = useState(true);
   const [showPeople, setShowPeople] = useState(true);
   const [audioStarted, setAudioStarted] = useState(false);
-  const [showFakeTraffic, setShowFakeTraffic] = useState(false);
   const [onlineCount, setOnlineCount] = useState(1);
   const [totalBurned, setTotalBurned] = useState(0);
   const [placeholder, setPlaceholder] = useState<string>(PLACEHOLDER_LINES[0]);
@@ -107,9 +91,6 @@ export function BonfireScene() {
     recent: [],
   });
   const [throttleNotice, setThrottleNotice] = useState<string | null>(null);
-  // 가짜 트래픽 토글이 OFF로 꺼졌을 때, in-flight으로 떠있던 setTimeout이
-  // 마저 발사돼 가짜 고구마를 spawn하는 race를 막기 위한 ref
-  const fakeTrafficRef = useRef(showFakeTraffic);
   const messageIdRef = useRef(1);
   const potatoIdRef = useRef(1);
   const emberIdRef = useRef(1);
@@ -186,22 +167,9 @@ export function BonfireScene() {
     });
   }, []);
 
-  // === messages from crowd ===
-  // isFake: 가짜 트래픽 stream에서 호출됐을 때만 true. 토글 OFF로 꺼지는 사이
-  // in-flight으로 떠 있던 spawn timer가 마저 발사되는 race를 막기 위함.
-  // 진짜 broadcast 메시지(isFake=false)는 게이트 없이 항상 spawn.
+  // === messages from crowd (other peers via broadcast) ===
   const pushMessageFromCrowd = useCallback(
-    ({
-      text,
-      nick,
-      sIdx,
-      isFake = false,
-    }: {
-      text: string;
-      nick: string;
-      sIdx: number;
-      isFake?: boolean;
-    }) => {
+    ({ text, nick, sIdx }: { text: string; nick: string; sIdx: number }) => {
       const id = messageIdRef.current++;
       const msg: ChatMessage = { id, text, nick, sIdx, time: Date.now(), isMe: false };
 
@@ -221,11 +189,7 @@ export function BonfireScene() {
       }
 
       setFeedMessages((prev) => [msg, ...prev].slice(0, 7));
-      setTimeout(() => {
-        // 가짜 트래픽이었던 메시지는 토글 OFF로 꺼지면 spawn 차단
-        if (isFake && !fakeTrafficRef.current) return;
-        spawnPotatoAtFire(msg);
-      }, 1500 + Math.random() * 1200);
+      setTimeout(() => spawnPotatoAtFire(msg), 150 + Math.random() * 250);
       setTimeout(() => {
         setFeedMessages((prev) => prev.map((x) => (x.id === id ? { ...x, fading: true } : x)));
         setTimeout(
@@ -237,43 +201,7 @@ export function BonfireScene() {
     [spawnPotatoAtFire],
   );
 
-  // === init silhouettes (가짜 트래픽 / 단독 모드 전용) ===
-  // 실제 multi-user 모드(supabase + fake off)에서는 presence sync가 silhouettes를 만든다.
-  // 그 외에는 onlineCount만큼 로컬 랜덤 silhouette을 채움.
-  useEffect(() => {
-    if (!showFakeTraffic && isSupabaseConfigured()) return;
-    const targetCount = Math.min(onlineCount, VISUAL_MAX_SILHOUETTES);
-    setSilhouettes((prev) => {
-      let mineIdx = mySilhouetteIdx;
-      if (mineIdx === null && targetCount > 0) {
-        mineIdx = Math.floor(Math.random() * targetCount);
-        setMySilhouetteIdx(mineIdx);
-      }
-      if (mineIdx !== null && mineIdx >= targetCount) {
-        mineIdx = targetCount - 1;
-        setMySilhouetteIdx(mineIdx);
-      }
-      const ensureMine = (arr: SilhouetteEntity[]): SilhouetteEntity[] => {
-        if (mineIdx === null || arr.length === 0) return arr;
-        if (arr[mineIdx].nick === myNick) return arr;
-        return arr.map((s, i) => (i === mineIdx ? { ...s, nick: myNick } : s));
-      };
-      if (prev.length === targetCount) return ensureMine(prev);
-      if (prev.length < targetCount) {
-        const additions: SilhouetteEntity[] = [];
-        for (let i = prev.length; i < targetCount; i++) {
-          additions.push(makeSilhouetteEntity(i));
-        }
-        return ensureMine([...prev, ...additions]);
-      }
-      return ensureMine(prev.slice(0, targetCount));
-    });
-  }, [onlineCount, myNick, mySilhouetteIdx, showFakeTraffic]);
-
-  // ref 동기화 — 토글 OFF 후에도 진행 중인 setTimeout에서 최신값 읽기 위함
-  useEffect(() => {
-    fakeTrafficRef.current = showFakeTraffic;
-  }, [showFakeTraffic]);
+  // silhouettes ref 동기화 — broadcast 핸들러에서 최신값 읽기 위함
   useEffect(() => {
     silhouettesRef.current = silhouettes;
   }, [silhouettes]);
@@ -281,7 +209,6 @@ export function BonfireScene() {
   // === Supabase Realtime: broadcast (메시지) + presence (접속자/실루엣) ===
   // 실제 멀티유저 모드일 때만. presence가 silhouettes 의 source of truth.
   useEffect(() => {
-    if (showFakeTraffic) return;
     if (!isSupabaseConfigured()) return;
     const supabase = getSupabase();
     if (!supabase || !mySpotRef.current) return;
@@ -299,30 +226,19 @@ export function BonfireScene() {
       flip: boolean;
       variant: number;
       joinedAt: number;
-      lastSeen: number;
     };
 
-    // 살아있는 peer만 추리는 stale filter — heartbeat 끊긴 지 12s 넘으면 제외
-    const STALE_AFTER_MS = 12000;
-
+    // presence sync 받을 때마다 silhouettes 재계산.
+    // heartbeat/stale filter는 안 씀 — background tab throttling로 false positive 발생함.
+    // Supabase 기본 disconnect 감지(WebSocket 끊김)에 맡김.
     const applyPeers = () => {
       const state = channel.presenceState<PresenceMeta>();
-      const now = Date.now();
       const peerList: PresenceMeta[] = [];
-      const mySessionKey = sessionIdRef.current;
       for (const key in state) {
         const arr = state[key];
         if (!arr || arr.length === 0) continue;
-        // track() 여러 번 호출하면 array에 누적되니 lastSeen 가장 최신 entry 사용
-        let meta = arr[0];
-        for (const m of arr) {
-          if ((m?.lastSeen ?? 0) > (meta?.lastSeen ?? 0)) meta = m;
-        }
+        const meta = arr[0];
         if (!meta?.nick) continue;
-        // 본인 세션은 무조건 포함 (heartbeat 갱신이 아직 안 보일 수도 있음)
-        const isMe = key === mySessionKey;
-        const last = meta.lastSeen ?? meta.joinedAt ?? now;
-        if (!isMe && now - last > STALE_AFTER_MS) continue;
         peerList.push(meta);
       }
       peerList.sort((a, b) => a.joinedAt - b.joinedAt);
@@ -350,6 +266,8 @@ export function BonfireScene() {
         const sIdx = sList.findIndex((s) => s.nick === data.nick);
         pushMessageFromCrowd({ text: data.text, nick: data.nick, sIdx });
       })
+      .on('presence', { event: 'join' }, applyPeers)
+      .on('presence', { event: 'leave' }, applyPeers)
       .on('presence', { event: 'sync' }, applyPeers)
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED' && mySpotRef.current) {
@@ -361,29 +279,11 @@ export function BonfireScene() {
             flip: mySpotRef.current.flip,
             variant: mySpotRef.current.variant,
             joinedAt: mySpotRef.current.joinedAt,
-            lastSeen: Date.now(),
           });
         }
       });
 
-    // heartbeat: 4s마다 lastSeen 갱신해서 다른 client에게 "나 살아있어" 알림
-    const heartbeat = setInterval(() => {
-      if (!mySpotRef.current) return;
-      void channel.track({
-        nick: myNick,
-        x: mySpotRef.current.x,
-        y: mySpotRef.current.y,
-        scale: mySpotRef.current.scale,
-        flip: mySpotRef.current.flip,
-        variant: mySpotRef.current.variant,
-        joinedAt: mySpotRef.current.joinedAt,
-        lastSeen: Date.now(),
-      });
-    }, 4000);
-
-    // stale 검사: 5s마다 stale peer 제거 (presence sync 안 와도 유령은 사라짐)
-    const stalePurge = setInterval(applyPeers, 5000);
-
+    // pagehide/beforeunload — fire되면 즉시 정리. 못 받는 브라우저는 server timeout 의존.
     const onLeave = () => {
       void channel.untrack();
       void supabase.removeChannel(channel);
@@ -392,56 +292,12 @@ export function BonfireScene() {
     window.addEventListener('beforeunload', onLeave);
 
     return () => {
-      clearInterval(heartbeat);
-      clearInterval(stalePurge);
       window.removeEventListener('pagehide', onLeave);
       window.removeEventListener('beforeunload', onLeave);
       channelRef.current = null;
       void supabase.removeChannel(channel);
     };
-  }, [showFakeTraffic, myNick, pushMessageFromCrowd]);
-
-  // === fake online drift — 토글 ON일 때만 ===
-  // (Supabase presence가 활성화되면 그쪽이 onlineCount를 덮어씀)
-  useEffect(() => {
-    if (!showFakeTraffic) {
-      // Supabase 안 붙은 경우에만 1로 리셋. 붙어있으면 presence가 관리.
-      if (!isSupabaseConfigured()) setOnlineCount(1);
-      return;
-    }
-    setOnlineCount((c) => (c < 8 ? 24 : c));
-    const t = setInterval(() => {
-      setOnlineCount((c) => Math.max(8, Math.min(36, c + (Math.random() < 0.5 ? -1 : 1))));
-    }, 6000);
-    return () => clearInterval(t);
-  }, [showFakeTraffic]);
-
-  // === fake stream — 토글 ON일 때만 ===
-  useEffect(() => {
-    if (!showFakeTraffic) return;
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const tickFn = () => {
-      if (cancelled) return;
-      const text = FAKE_MESSAGES[Math.floor(Math.random() * FAKE_MESSAGES.length)];
-      // 가짜 트래픽은 "나" 자리는 빼고 픽
-      let sIdx = -1;
-      if (silhouettes.length > 1) {
-        do {
-          sIdx = Math.floor(Math.random() * silhouettes.length);
-        } while (sIdx === mySilhouetteIdx);
-      }
-      const nick = sIdx >= 0 ? silhouettes[sIdx].nick : makeNickname();
-      pushMessageFromCrowd({ text, nick, sIdx, isFake: true });
-      const delay = 2400 + Math.random() * 4000;
-      timer = setTimeout(tickFn, delay);
-    };
-    if (silhouettes.length) timer = setTimeout(tickFn, 1200);
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-    };
-  }, [showFakeTraffic, silhouettes, mySilhouetteIdx, pushMessageFromCrowd]);
+  }, [myNick, pushMessageFromCrowd]);
 
   // === comfort drift — 하늘에 위로 문구 천천히 떠올랐다 사라짐 ===
   useEffect(() => {
@@ -867,29 +723,6 @@ export function BonfireScene() {
               </svg>
             )}
           </button>
-          {process.env.NODE_ENV === 'development' && (
-            <button
-              type="button"
-              className={styles.iconToggle}
-              onClick={() => setShowFakeTraffic((s) => !s)}
-              aria-label={showFakeTraffic ? '가짜 트래픽 끄기' : '가짜 트래픽 켜기'}
-              title={showFakeTraffic ? '가짜 트래픽 끄기 (dev)' : '가짜 트래픽 켜기 (dev)'}
-              style={{ opacity: showFakeTraffic ? 1 : 0.6 }}
-            >
-              {/* flask icon — dev test */}
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <path
-                  d="M6 2h4M6.5 2v4l-3 6.5c-.4.9.2 1.5 1 1.5h7c.8 0 1.4-.6 1-1.5l-3-6.5V2"
-                  stroke="currentColor"
-                  strokeWidth="1.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  fill={showFakeTraffic ? 'currentColor' : 'none'}
-                  fillOpacity={showFakeTraffic ? 0.25 : 0}
-                />
-              </svg>
-            </button>
-          )}
         </div>
       </div>
 
