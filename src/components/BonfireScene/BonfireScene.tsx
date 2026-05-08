@@ -117,6 +117,15 @@ export function BonfireScene() {
   const channelRef = useRef<RealtimeChannel | null>(null);
   // setSilhouettes updater 안에서 부작용 호출 시 StrictMode가 두 번 호출하는 문제 방지용
   const silhouettesRef = useRef<SilhouetteEntity[]>([]);
+  // presence key — tab/session 별로 고유. 닉네임을 키로 쓰면 새로고침 시 옛 닉이
+  // 서버 timeout(~30s)까지 ghost로 남음. UUID로 매 세션 새 슬롯 차지하게.
+  const sessionIdRef = useRef<string | null>(null);
+  if (sessionIdRef.current === null) {
+    sessionIdRef.current =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2) + Date.now().toString(36);
+  }
   // 내 자리 정보 (mount 시 한 번만 정해서 presence로 공유)
   const mySpotRef = useRef<{
     x: number;
@@ -278,7 +287,7 @@ export function BonfireScene() {
     if (!supabase || !mySpotRef.current) return;
 
     const channel = supabase.channel('campfire-room', {
-      config: { presence: { key: myNick } },
+      config: { presence: { key: sessionIdRef.current ?? myNick } },
     });
     channelRef.current = channel;
 
