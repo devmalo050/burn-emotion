@@ -83,7 +83,7 @@ export function BonfireScene() {
   const [comfortMsg, setComfortMsg] = useState<(ComfortLine & { key: number }) | null>(null);
   const [embers, setEmbers] = useState<EmberParticle[]>([]);
   const [shake, setShake] = useState(false);
-  const [muted, setMuted] = useState(false);
+  const [muted, setMuted] = useState(true);
   const [showPeople, setShowPeople] = useState(true);
   const [audioStarted, setAudioStarted] = useState(false);
   const [showFakeTraffic, setShowFakeTraffic] = useState(false);
