@@ -307,8 +307,8 @@ export function BonfireScene() {
       setComfortMsg({ ...c, key: Date.now() });
       hideTimer = setTimeout(() => setComfortMsg(null), 8000);
     };
-    const initialTimer = setTimeout(tickFn, 3000);
-    const intervalTimer = setInterval(tickFn, 18000);
+    const initialTimer = setTimeout(tickFn, 1500);
+    const intervalTimer = setInterval(tickFn, 14000);
     return () => {
       clearTimeout(initialTimer);
       clearInterval(intervalTimer);
@@ -547,7 +547,6 @@ export function BonfireScene() {
       {comfortMsg && (
         <div className={styles.comfort} key={comfortMsg.key}>
           <div className={styles.comfortQuote}>{comfortMsg.kr}</div>
-          <div className={styles.comfortQuoteEn}>{comfortMsg.en}</div>
         </div>
       )}
 

@@ -1,7 +1,10 @@
+// 입력바 placeholder — 한국어 전용. 채팅 한 마디가 군고구마 한 알이 되는 흐름에 맞게.
 export const PLACEHOLDER_LINES: readonly string[] = [
   '오늘 무슨 일이 있었나요…',
-  "what's on your mind tonight…",
   '쏟아내도 괜찮아요…',
-  "let it out, no one's keeping score…",
-  '구겨서 던져도 돼요…',
+  '말 한 마디가 군고구마 한 알이 돼요…',
+  '편하게 털어놓아요…',
+  '여기 모닥불 옆이에요…',
+  '한 마디 던져 보세요…',
+  '익어가는 동안 잠시 쉬어요…',
 ] as const;
