@@ -57,6 +57,11 @@ export const metadata: Metadata = {
       'max-snippet': -1,
     },
   },
+  verification: {
+    other: {
+      'naver-site-verification': '57baa05bb3a573f9922c341746424dc666fc5980',
+    },
+  },
   category: 'lifestyle',
 };
 
