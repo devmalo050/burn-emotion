@@ -14,18 +14,17 @@ export default function Icon() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: '#0b0b10',
+          background: 'transparent',
         }}
       >
-        {/* 군고구마 — 분홍-빨강 톤의 길쭉한 타원 */}
+        {/* 군고구마 — 분홍-빨강 톤 길쭉한 타원, 거의 가득 채움 */}
         <div
           style={{
-            width: 16,
-            height: 24,
-            background: 'linear-gradient(135deg, #d97560 0%, #b04a32 50%, #6e2515 100%)',
+            width: 22,
+            height: 30,
+            background: '#c25a2c',
             borderRadius: '50% 60% 55% 65% / 60% 55% 65% 60%',
-            transform: 'rotate(-18deg)',
-            boxShadow: 'inset -1px -2px 0 rgba(0,0,0,0.4), inset 1px 1px 0 rgba(255,170,140,0.3)',
+            transform: 'rotate(-22deg)',
             display: 'flex',
           }}
         />
