@@ -306,14 +306,22 @@ export function BonfireScene() {
     if (!supabase) return;
 
     let cancelled = false;
+    // bigint는 supabase-js가 string으로 반환할 수 있어 number로 캐스팅
+    const toNumber = (v: unknown): number | null => {
+      if (typeof v === 'number') return v;
+      if (typeof v === 'string') {
+        const n = parseInt(v, 10);
+        return isNaN(n) ? null : n;
+      }
+      return null;
+    };
 
     // 1) 마운트 시 오늘 카운트 fetch + 어제 row 정리
-    void supabase
-      .rpc('start_today')
-      .then(({ data }) => {
-        if (cancelled) return;
-        if (typeof data === 'number') setTotalBurned(data);
-      });
+    void supabase.rpc('start_today').then(({ data, error }) => {
+      if (cancelled || error) return;
+      const n = toNumber(data);
+      if (n !== null) setTotalBurned(n);
+    });
 
     // 2) Realtime: daily_counter 변경 구독해서 다른 클라 +1 시 갱신
     const counterChannel = supabase
@@ -323,16 +331,16 @@ export function BonfireScene() {
         { event: '*', schema: 'public', table: 'daily_counter' },
         (payload) => {
           if (cancelled) return;
-          const row = payload.new as { date: string; count: number } | null;
+          const row = payload.new as { date: string; count: number | string } | null;
           if (!row) return;
-          // 오늘 row만 반영 (Asia/Seoul 자정 기준은 서버에서 결정)
           const todayKST = new Date(
             new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }),
           )
             .toISOString()
             .slice(0, 10);
           if (row.date === todayKST) {
-            setTotalBurned(row.count);
+            const n = toNumber(row.count);
+            if (n !== null) setTotalBurned(n);
           }
         },
       )
