@@ -333,8 +333,10 @@ export function BonfireScene() {
   }, []);
 
   // === 본인 고구마가 pile에서 사라지면(=다 익어 사라지거나 evict됨) 그때 카운트 +1 ===
-  // pile.length 변화에만 반응 (roast 진행 중인 frame마다는 안 발사)
-  const pileLength = pile.length;
+  // pile.length가 아니라 ID 집합 변화에 반응해야 함.
+  // 이유: MAX_POTATOES 도달 시 cracked 한 개 evict + 새 spawn 하면 length 동일(7→7)
+  // 인데 id는 바뀌니, length만 보면 evict된 내 고구마 카운트가 누락됨.
+  const pileIdsKey = pile.map((p) => p.id).join(',');
   useEffect(() => {
     const currentIds = new Set(pile.map((p) => p.id));
     const disappearedMine: number[] = [];
@@ -361,9 +363,10 @@ export function BonfireScene() {
         }
       });
     }
-    // pile 자체가 아니라 pileLength로 dep 잡아 roast 진행 frame엔 무시
+    // pile 자체가 아니라 pileIdsKey로 dep 잡아 roast 진행 frame엔 무시
+    // (length만 보면 evict+spawn 동시 발생 시 missed)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pileLength]);
+  }, [pileIdsKey]);
 
   // === comfort drift — 하늘에 위로 문구 천천히 떠올랐다 사라짐 ===
   useEffect(() => {
