@@ -94,6 +94,10 @@ export function BonfireScene() {
   const messageIdRef = useRef(1);
   const potatoIdRef = useRef(1);
   const emberIdRef = useRef(1);
+  // 본인이 spawn한 고구마 id들 — 익으면 inc_burned() RPC 발사 후 set에서 제거.
+  // 다른 사람이 보낸 메시지로 spawn된 고구마는 여기 안 들어가서 우리가 카운트 안 함
+  // (그쪽 sender가 카운트). 결과적으로 메시지 1개당 정확히 1번 카운트.
+  const myPotatoIdsRef = useRef<Set<number>>(new Set());
   // 실시간 채널 (broadcast + presence)
   const channelRef = useRef<RealtimeChannel | null>(null);
   // setSilhouettes updater 안에서 부작용 호출 시 StrictMode가 두 번 호출하는 문제 방지용
@@ -131,6 +135,7 @@ export function BonfireScene() {
   const spawnPotatoAtFire = useCallback((msg: ChatMessage) => {
     const id = potatoIdRef.current++;
     const seed = id;
+    let actuallySpawned = false;
     setPile((prev) => {
       let next = prev;
       if (next.length >= MAX_POTATOES) {
@@ -142,6 +147,7 @@ export function BonfireScene() {
           return prev;
         }
       }
+      actuallySpawned = true;
       const used = new Set(next.map((p) => p.slotIdx));
       let freeSlot = 0;
       for (let s = 0; s < POTATO_SLOTS.length; s++) {
@@ -165,6 +171,10 @@ export function BonfireScene() {
         },
       ];
     });
+    // 본인이 쳤을 때만 my pending set에 추가 (다 익으면 내가 카운트)
+    if (msg.isMe && actuallySpawned) {
+      myPotatoIdsRef.current.add(id);
+    }
   }, []);
 
   // === messages from crowd (other peers via broadcast) ===
@@ -321,6 +331,39 @@ export function BonfireScene() {
       cancelled = true;
     };
   }, []);
+
+  // === 본인 고구마가 pile에서 사라지면(=다 익어 사라지거나 evict됨) 그때 카운트 +1 ===
+  // pile.length 변화에만 반응 (roast 진행 중인 frame마다는 안 발사)
+  const pileLength = pile.length;
+  useEffect(() => {
+    const currentIds = new Set(pile.map((p) => p.id));
+    const disappearedMine: number[] = [];
+    for (const id of myPotatoIdsRef.current) {
+      if (!currentIds.has(id)) disappearedMine.push(id);
+    }
+    if (disappearedMine.length === 0) return;
+    for (const id of disappearedMine) myPotatoIdsRef.current.delete(id);
+    const supabase = getSupabase();
+    if (!supabase) return;
+    for (const _ of disappearedMine) {
+      void supabase.rpc('inc_burned').then(({ data, error }) => {
+        if (error) return;
+        const n =
+          typeof data === 'number' ? data : parseInt(String(data ?? ''), 10);
+        if (isNaN(n)) return;
+        setTotalBurned((prev) => Math.max(prev, n));
+        if (channelRef.current) {
+          void channelRef.current.send({
+            type: 'broadcast',
+            event: 'counter',
+            payload: { count: n },
+          });
+        }
+      });
+    }
+    // pile 자체가 아니라 pileLength로 dep 잡아 roast 진행 frame엔 무시
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pileLength]);
 
   // === comfort drift — 하늘에 위로 문구 천천히 떠올랐다 사라짐 ===
   useEffect(() => {
@@ -481,24 +524,6 @@ export function BonfireScene() {
       }
       lastSentRef.current = { text, at: now, recent: [...recent, now] };
       setDraftMessage('');
-      // 서버 카운터 +1 → RPC가 새 카운트 반환 → 본인 즉시 update + 다른 peer에 broadcast
-      const supabase = getSupabase();
-      if (supabase) {
-        void supabase.rpc('inc_burned').then(({ data, error }) => {
-          if (error) return;
-          const n =
-            typeof data === 'number' ? data : parseInt(String(data ?? ''), 10);
-          if (isNaN(n)) return;
-          setTotalBurned((prev) => Math.max(prev, n));
-          if (channelRef.current) {
-            void channelRef.current.send({
-              type: 'broadcast',
-              event: 'counter',
-              payload: { count: n },
-            });
-          }
-        });
-      }
       const id = messageIdRef.current++;
       // 내 메시지는 mySilhouetteIdx (= 내 실루엣) 위에서 떠오름
       const sIdx =
