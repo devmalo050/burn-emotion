@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "burn-emotion",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-05-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  // 환경 변수는 Cloudflare 대시보드(Workers & Pages → Settings → Variables)에서 설정.
+  // 또는 로컬에서 .dev.vars 파일에 적어 wrangler dev 시 주입.
+  "observability": {
+    "enabled": true
+  }
+}
