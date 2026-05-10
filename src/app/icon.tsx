@@ -15,7 +15,7 @@ export default function Icon() {
           alignItems: 'center',
           justifyContent: 'center',
           background: '#0b0b10',
-          fontSize: 22,
+          fontSize: 28,
         }}
       >
         🍠
