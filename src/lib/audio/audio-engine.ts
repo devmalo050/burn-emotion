@@ -55,7 +55,7 @@ class AudioEngineImpl {
     return this.muted;
   }
 
-  startBgm(src = '/audio/fireplace-bgm.mp3', volume = 0.22): void {
+  startBgm(src = '/audio/fireplace-bgm.mp3', volume = 0.14): void {
     if (typeof window === 'undefined') return;
     if (!this.bgmEl) {
       const a = new Audio(src);
