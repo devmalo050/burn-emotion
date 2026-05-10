@@ -1,0 +1,12 @@
+/* sr-only — 화면엔 안 보이지만 크롤러/스크린리더는 읽을 수 있게 */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
