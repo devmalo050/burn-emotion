@@ -299,6 +299,51 @@ export function BonfireScene() {
     };
   }, [myNick, pushMessageFromCrowd]);
 
+  // === 오늘 구워진 고구마 카운터 — Supabase + Realtime ===
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    const supabase = getSupabase();
+    if (!supabase) return;
+
+    let cancelled = false;
+
+    // 1) 마운트 시 오늘 카운트 fetch + 어제 row 정리
+    void supabase
+      .rpc('start_today')
+      .then(({ data }) => {
+        if (cancelled) return;
+        if (typeof data === 'number') setTotalBurned(data);
+      });
+
+    // 2) Realtime: daily_counter 변경 구독해서 다른 클라 +1 시 갱신
+    const counterChannel = supabase
+      .channel('daily-counter')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'daily_counter' },
+        (payload) => {
+          if (cancelled) return;
+          const row = payload.new as { date: string; count: number } | null;
+          if (!row) return;
+          // 오늘 row만 반영 (Asia/Seoul 자정 기준은 서버에서 결정)
+          const todayKST = new Date(
+            new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }),
+          )
+            .toISOString()
+            .slice(0, 10);
+          if (row.date === todayKST) {
+            setTotalBurned(row.count);
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      void supabase.removeChannel(counterChannel);
+    };
+  }, []);
+
   // === comfort drift — 하늘에 위로 문구 천천히 떠올랐다 사라짐 ===
   useEffect(() => {
     let hideTimer: ReturnType<typeof setTimeout> | null = null;
@@ -380,9 +425,9 @@ export function BonfireScene() {
         }
         return next;
       });
-      if (didFinish) {
-        setTotalBurned((t) => t + 1);
-      }
+      // 카운터는 sender가 submit 시 RPC로 +1 시키고 Realtime 구독으로 모든 클라가 갱신.
+      // 여기서 로컬 +1 안 함 (예전엔 했지만 server 카운터로 옮김).
+      void didFinish;
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
@@ -458,6 +503,10 @@ export function BonfireScene() {
       }
       lastSentRef.current = { text, at: now, recent: [...recent, now] };
       setDraftMessage('');
+      // 서버 카운터 +1 — 같은 메시지 보낸 다른 클라들은 자기 RPC를 따로 호출 안 함
+      // (sender만 호출, Realtime으로 모두 갱신). 못 들어가도 UX엔 큰 영향 X.
+      const supabase = getSupabase();
+      if (supabase) void supabase.rpc('inc_burned');
       const id = messageIdRef.current++;
       // 내 메시지는 mySilhouetteIdx (= 내 실루엣) 위에서 떠오름
       const sIdx =
