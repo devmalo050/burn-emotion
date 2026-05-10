@@ -266,6 +266,12 @@ export function BonfireScene() {
         const sIdx = sList.findIndex((s) => s.nick === data.nick);
         pushMessageFromCrowd({ text: data.text, nick: data.nick, sIdx });
       })
+      .on('broadcast', { event: 'counter' }, (payload) => {
+        const data = payload.payload as { count: number | string };
+        const n =
+          typeof data?.count === 'number' ? data.count : parseInt(String(data?.count ?? ''), 10);
+        if (!isNaN(n)) setTotalBurned((prev) => Math.max(prev, n));
+      })
       .on('presence', { event: 'join' }, applyPeers)
       .on('presence', { event: 'leave' }, applyPeers)
       .on('presence', { event: 'sync' }, applyPeers)
@@ -299,56 +305,20 @@ export function BonfireScene() {
     };
   }, [myNick, pushMessageFromCrowd]);
 
-  // === 오늘 구워진 고구마 카운터 — Supabase + Realtime ===
+  // === 오늘 구워진 고구마 카운터 — 마운트 시 fetch만, 갱신은 campfire-room broadcast로 ===
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
     const supabase = getSupabase();
     if (!supabase) return;
-
     let cancelled = false;
-    // bigint는 supabase-js가 string으로 반환할 수 있어 number로 캐스팅
-    const toNumber = (v: unknown): number | null => {
-      if (typeof v === 'number') return v;
-      if (typeof v === 'string') {
-        const n = parseInt(v, 10);
-        return isNaN(n) ? null : n;
-      }
-      return null;
-    };
-
-    // 1) 마운트 시 오늘 카운트 fetch + 어제 row 정리
     void supabase.rpc('start_today').then(({ data, error }) => {
       if (cancelled || error) return;
-      const n = toNumber(data);
-      if (n !== null) setTotalBurned(n);
+      const n =
+        typeof data === 'number' ? data : parseInt(String(data ?? ''), 10);
+      if (!isNaN(n)) setTotalBurned(n);
     });
-
-    // 2) Realtime: daily_counter 변경 구독해서 다른 클라 +1 시 갱신
-    const counterChannel = supabase
-      .channel('daily-counter')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'daily_counter' },
-        (payload) => {
-          if (cancelled) return;
-          const row = payload.new as { date: string; count: number | string } | null;
-          if (!row) return;
-          const todayKST = new Date(
-            new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }),
-          )
-            .toISOString()
-            .slice(0, 10);
-          if (row.date === todayKST) {
-            const n = toNumber(row.count);
-            if (n !== null) setTotalBurned(n);
-          }
-        },
-      )
-      .subscribe();
-
     return () => {
       cancelled = true;
-      void supabase.removeChannel(counterChannel);
     };
   }, []);
 
@@ -511,10 +481,24 @@ export function BonfireScene() {
       }
       lastSentRef.current = { text, at: now, recent: [...recent, now] };
       setDraftMessage('');
-      // 서버 카운터 +1 — 같은 메시지 보낸 다른 클라들은 자기 RPC를 따로 호출 안 함
-      // (sender만 호출, Realtime으로 모두 갱신). 못 들어가도 UX엔 큰 영향 X.
+      // 서버 카운터 +1 → RPC가 새 카운트 반환 → 본인 즉시 update + 다른 peer에 broadcast
       const supabase = getSupabase();
-      if (supabase) void supabase.rpc('inc_burned');
+      if (supabase) {
+        void supabase.rpc('inc_burned').then(({ data, error }) => {
+          if (error) return;
+          const n =
+            typeof data === 'number' ? data : parseInt(String(data ?? ''), 10);
+          if (isNaN(n)) return;
+          setTotalBurned((prev) => Math.max(prev, n));
+          if (channelRef.current) {
+            void channelRef.current.send({
+              type: 'broadcast',
+              event: 'counter',
+              payload: { count: n },
+            });
+          }
+        });
+      }
       const id = messageIdRef.current++;
       // 내 메시지는 mySilhouetteIdx (= 내 실루엣) 위에서 떠오름
       const sIdx =
