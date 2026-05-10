@@ -17,14 +17,15 @@ export default function Icon() {
           background: 'transparent',
         }}
       >
-        {/* 군고구마 — 분홍-빨강 톤 길쭉한 타원, 거의 가득 채움 */}
+        {/* 군고구마 — 분홍-빨강 톤 그라데이션 + 하이라이트로 입체감 */}
         <div
           style={{
-            width: 22,
-            height: 30,
-            background: '#c25a2c',
+            width: 20,
+            height: 28,
+            background: 'linear-gradient(135deg, #d97560 0%, #b04a32 50%, #6e2515 100%)',
             borderRadius: '50% 60% 55% 65% / 60% 55% 65% 60%',
-            transform: 'rotate(-22deg)',
+            transform: 'rotate(-18deg)',
+            boxShadow: 'inset -1px -2px 0 rgba(0,0,0,0.4), inset 1px 1px 0 rgba(255,170,140,0.3)',
             display: 'flex',
           }}
         />
