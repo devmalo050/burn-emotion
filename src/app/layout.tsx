@@ -1,5 +1,8 @@
 import type { Metadata, Viewport } from 'next';
+import { GoogleAnalytics } from '@next/third-parties/google';
 import './globals.css';
+
+const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://burn-emotion.vercel.app';
 const SITE_NAME = '군고구마 굽기';
@@ -80,6 +83,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>{children}</body>
+      {GA_ID && <GoogleAnalytics gaId={GA_ID} />}
     </html>
   );
 }
