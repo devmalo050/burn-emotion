@@ -135,7 +135,6 @@ export function BonfireScene() {
   const spawnPotatoAtFire = useCallback((msg: ChatMessage) => {
     const id = potatoIdRef.current++;
     const seed = id;
-    let actuallySpawned = false;
     setPile((prev) => {
       let next = prev;
       if (next.length >= MAX_POTATOES) {
@@ -147,7 +146,12 @@ export function BonfireScene() {
           return prev;
         }
       }
-      actuallySpawned = true;
+      // 본인이 쳤을 때만 my pending set에 추가 (다 익으면 내가 카운트).
+      // updater 안에서 처리해야 React 18 setState 비동기성에 안 휘말림.
+      // (예전엔 outer flag로 했더니 setPile 호출 끝난 시점엔 updater가 아직
+      //  안 돌아가서 flag가 false로 보여 카운팅이 누락됨.)
+      // StrictMode 더블콜에도 Set.add는 idempotent라 안전.
+      if (msg.isMe) myPotatoIdsRef.current.add(id);
       const used = new Set(next.map((p) => p.slotIdx));
       let freeSlot = 0;
       for (let s = 0; s < POTATO_SLOTS.length; s++) {
@@ -171,10 +175,6 @@ export function BonfireScene() {
         },
       ];
     });
-    // 본인이 쳤을 때만 my pending set에 추가 (다 익으면 내가 카운트)
-    if (msg.isMe && actuallySpawned) {
-      myPotatoIdsRef.current.add(id);
-    }
   }, []);
 
   // === messages from crowd (other peers via broadcast) ===
@@ -419,28 +419,25 @@ export function BonfireScene() {
   }, []);
 
   // === ROAST TICKER ===
+  // wall-clock 기반 (placedAt 시점부터 경과한 실제 시간으로 roast 계산).
+  // RAF만 쓰면 백그라운드 탭에서 멈춰서 → roast 진행 안 됨 → cracked 안 됨 → pile에서
+  // 안 사라짐 → pileIdsKey 변화 없음 → inc_burned 호출 누락 → 카운팅 안 됨.
+  // 그래서 setInterval 백업 동시에 돌림 (백그라운드에서도 ~1Hz throttle 되긴 해도 fire됨).
   useEffect(() => {
     let raf = 0;
-    let last = performance.now();
-    const speed = 1;
-    const loop = (now: number) => {
-      const dt = Math.min(100, now - last);
-      last = now;
-      const inc = (dt / ROAST_DURATION_MS) * speed;
-      let didFinish = false;
+    const tick = () => {
+      const now = performance.now();
       setPile((prev) => {
         if (prev.length === 0) return prev;
         const next: PotatoState[] = [];
         for (const p of prev) {
           if (p.cracked) {
-            if (now - p.crackedAt > CRACK_DURATION_MS) {
-              didFinish = true;
-              continue;
-            }
+            if (now - p.crackedAt > CRACK_DURATION_MS) continue;
             next.push(p);
             continue;
           }
-          const newRoast = Math.min(1, p.roast + inc);
+          const elapsed = now - p.placedAt;
+          const newRoast = Math.min(1, elapsed / ROAST_DURATION_MS);
           if (newRoast >= 1) {
             next.push({ ...p, roast: 1, cracked: true, crackedAt: now });
           } else {
@@ -449,13 +446,17 @@ export function BonfireScene() {
         }
         return next;
       });
-      // 카운터는 sender가 submit 시 RPC로 +1 시키고 Realtime 구독으로 모든 클라가 갱신.
-      // 여기서 로컬 +1 안 함 (예전엔 했지만 server 카운터로 옮김).
-      void didFinish;
+    };
+    const loop = () => {
+      tick();
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+    const bgInterval = setInterval(tick, 250);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearInterval(bgInterval);
+    };
   }, []);
 
   // === first-interaction audio start ===
@@ -479,19 +480,28 @@ export function BonfireScene() {
     AudioEngine.setMuted(muted);
   }, [muted]);
 
+  // === 첫 진입 시 입력창에 포커스 (모바일은 브라우저가 막을 수 있음) ===
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
   // === poke fire (easter egg: tap the campfire to roast faster) ===
   const pokeFire = useCallback(() => {
     AudioEngine.ensure();
     setShake(true);
     setTimeout(() => setShake(false), 220);
+    // roast가 placedAt 기반이라 직접 못 더함 — placedAt을 앞당겨서 시뮬레이션.
     setPile((prev) =>
       prev.map((p) => {
         if (p.cracked) return p;
-        const newRoast = Math.min(1, p.roast + POKE_BOOST);
+        const now = performance.now();
+        const newPlacedAt = p.placedAt - POKE_BOOST * ROAST_DURATION_MS;
+        const elapsed = now - newPlacedAt;
+        const newRoast = Math.min(1, elapsed / ROAST_DURATION_MS);
         if (newRoast >= 1) {
-          return { ...p, roast: 1, cracked: true, crackedAt: performance.now() };
+          return { ...p, placedAt: newPlacedAt, roast: 1, cracked: true, crackedAt: now };
         }
-        return { ...p, roast: newRoast };
+        return { ...p, placedAt: newPlacedAt, roast: newRoast };
       }),
     );
     for (let k = 0; k < 8; k++) {
