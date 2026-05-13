@@ -45,3 +45,6 @@ cloudflare-env.d.ts
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# playwright MCP 자동화 검증 산출물 (스크린샷·로그)
+.playwright-mcp/
