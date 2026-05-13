@@ -509,14 +509,23 @@ export function BonfireScene() {
     inputRef.current?.focus();
   }, []);
 
-  // === Enter: 입력창에 포커스 없을 때 채팅창으로 점프 (idle 일 때만) ===
+  // === Enter / : 입력창에 포커스 없을 때 채팅창으로 점프 (idle 일 때만) ===
+  // 슬래시는 입력값에 그대로 prefix 추가해서 "/별똥별" 같은 슬래시 커맨드 자연스럽게 시작.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Enter') return;
       if (gameState !== 'idle') return;
       if (document.activeElement === inputRef.current) return;
-      e.preventDefault();
-      inputRef.current?.focus();
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        inputRef.current?.focus();
+        return;
+      }
+      if (e.key === '/') {
+        e.preventDefault();
+        setDraftMessage((prev) => prev + '/');
+        inputRef.current?.focus();
+        return;
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -971,7 +980,9 @@ export function BonfireScene() {
               <div
                 className={styles.silhouetteNick}
                 style={{
-                  transform: `translateX(-50%) ${s.flip ? 'scaleX(-1)' : ''}`,
+                  // 본인은 부모 silhouette 에 scaleX(-1) 안 적용했으므로 nick 도 flip 무시.
+                  // 그 외 사람은 부모가 scaleX(-1) 라 nick 을 또 scaleX(-1) 해서 정상.
+                  transform: `translateX(-50%) ${!isMine && s.flip ? 'scaleX(-1)' : ''}`,
                   ...(isMine ? { color: '#ffd590', fontWeight: 600 } : {}),
                 }}
               >
@@ -990,7 +1001,9 @@ export function BonfireScene() {
                 <div
                   className={styles.silhouetteBubble}
                   key={activeBubbles[i].key}
-                  style={{ transform: `translateX(-50%) ${s.flip ? 'scaleX(-1)' : ''}` }}
+                  style={{
+                    transform: `translateX(-50%) ${!isMine && s.flip ? 'scaleX(-1)' : ''}`,
+                  }}
                 >
                   {activeBubbles[i].text}
                 </div>
@@ -1371,14 +1384,11 @@ export function BonfireScene() {
                     fontSize: 56,
                     fontWeight: 700,
                     color: '#ffd590',
-                    margin: '12px 0 6px',
+                    margin: '12px 0 24px',
                     fontVariantNumeric: 'tabular-nums',
                   }}
                 >
                   {(lastScoreSec ?? 0).toFixed(2)}초
-                </div>
-                <div style={{ fontSize: 14, opacity: 0.65, marginBottom: 24 }}>
-                  버텼어요
                 </div>
 
                 <div
