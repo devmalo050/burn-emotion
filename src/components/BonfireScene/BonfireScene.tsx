@@ -81,6 +81,9 @@ export function BonfireScene() {
   const [pile, setPile] = useState<PotatoState[]>([]);
   // 내 자리 인덱스 — 세션 시작 후 첫 silhouettes 생성 시 랜덤 선택해서 고정
   const [mySilhouetteIdx, setMySilhouetteIdx] = useState<number | null>(null);
+  // 이스터에그: 방향키로 본인 캐릭터 이동, 스페이스바로 점프. 로컬 전용 (presence 동기화 X).
+  // setState 안 거치고 ref 로 DOM 직접 갱신 — 매 프레임 리렌더 없어 점프 낙하 시 jitter 안 생김.
+  const myCharRef = useRef<HTMLDivElement | null>(null);
 
   const fireRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -485,6 +488,133 @@ export function BonfireScene() {
     inputRef.current?.focus();
   }, []);
 
+  // === EASTER EGG: 방향키 이동 + 스페이스바 점프 ===
+  // 본인 화면에서만 (presence 업데이트 안 함). 채팅 입력창 blur 일 때만 키 인식.
+  // 대각선은 두 키 동시 입력 시 자동 정규화 (대각선이 더 빠르지 않게).
+  useEffect(() => {
+    const motion = {
+      dx: 0,
+      dy: 0,
+      yJump: 0,
+      vy: 0,
+      jumping: false,
+      keys: new Set<string>(),
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      const k = e.key;
+      const isMoveKey =
+        k === 'ArrowLeft' ||
+        k === 'ArrowRight' ||
+        k === 'ArrowUp' ||
+        k === 'ArrowDown' ||
+        k === ' ';
+      if (!isMoveKey) return;
+      const input = inputRef.current;
+      // 입력창에 텍스트가 있으면 채팅용으로 양보 (커서 이동/스페이스 입력).
+      // 비어있으면 자동으로 blur 시키고 캐릭터 조작.
+      if (input && document.activeElement === input) {
+        if (input.value !== '') return;
+        input.blur();
+      }
+      e.preventDefault();
+      motion.keys.add(k);
+      if (k === ' ' && !motion.jumping) {
+        motion.vy = 0.95;
+        motion.jumping = true;
+      }
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      motion.keys.delete(e.key);
+    };
+    const onBlur = () => motion.keys.clear();
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
+
+    let raf = 0;
+    let last = performance.now();
+    const SPEED = 0.28;
+    const GRAVITY = 0.0038;
+
+    const loop = (now: number) => {
+      const dt = Math.min(50, now - last);
+      last = now;
+
+      let kx = 0;
+      let ky = 0;
+      if (motion.keys.has('ArrowLeft')) kx -= 1;
+      if (motion.keys.has('ArrowRight')) kx += 1;
+      if (motion.keys.has('ArrowUp')) ky += 1;
+      if (motion.keys.has('ArrowDown')) ky -= 1;
+      if (kx !== 0 && ky !== 0) {
+        const k = Math.SQRT1_2;
+        kx *= k;
+        ky *= k;
+      }
+      motion.dx += kx * SPEED * dt;
+      motion.dy += ky * SPEED * dt;
+
+      // === 화면 안 / 땅 위로 clamp ===
+      // silhouettes 컨테이너:
+      //   width: min(1100, sw), left: 50%, translateX(-50%), bottom: 180px
+      // silhouette의 s.x % 는 컨테이너 너비 기준이고, s.y(=spot.y) 는 컨테이너 bottom(=180px) 기준.
+      // 화면 절대좌표로 환산해서 clamp.
+      const spot = mySpotRef.current;
+      const sw = window.innerWidth;
+      const sh = window.innerHeight;
+      const cw = Math.min(1100, sw);
+      const containerLeft = (sw - cw) / 2;
+      const containerBottom = 180;
+      const MARGIN_X = 40;                 // 캐릭터 너비 절반
+      // NightField 그라데이션: top 0~38% transparent(하늘), 38~62% fade, 62~100% 땅.
+      // 캐릭터 발이 "땅 색이 시작되는 선"(top 62% = bottom 38%) 위로 가지 못하게.
+      // 그 위는 fade zone 이라 시각적으로 이미 "땅 위에 떠 있는" 느낌.
+      const SKY_BOTTOM_RATIO = 0.38;
+      const skyBottomPx = sh * SKY_BOTTOM_RATIO;
+
+      if (spot) {
+        const charCenterX = containerLeft + (spot.x / 100) * cw;
+        // 좌우 — base 가 어디든 브라우저 창의 좌·우 끝까지 도달 가능.
+        const dxMin = MARGIN_X - charCenterX;
+        const dxMax = sw - MARGIN_X - charCenterX;
+        const dyMin = -spot.y;                                  // 컨테이너 바닥 이하 못 내려감
+        const dyMax = skyBottomPx - containerBottom - spot.y;   // 발이 땅 선 못 넘게
+        motion.dx = Math.max(dxMin, Math.min(dxMax, motion.dx));
+        motion.dy = Math.max(dyMin, Math.min(dyMax, motion.dy));
+      }
+
+      // 점프는 dy 한계와 무관하게 자유 — 땅 선에서 점프해도 잠깐 위로 갔다가 자연 낙하.
+      // 천장 cap 안 검: cap 으로 vy=0 잘라버리면 정점이 갑자기 끝나서 "확 떨어지는" 느낌이 남.
+      // 안 자르면 올라간 시간 = 떨어진 시간 대칭.
+      if (motion.jumping) {
+        motion.vy -= GRAVITY * dt;
+        motion.yJump += motion.vy * dt;
+        if (motion.yJump <= 0) {
+          motion.yJump = 0;
+          motion.vy = 0;
+          motion.jumping = false;
+        }
+      }
+
+      // ref 로 DOM 직접 갱신 — setState 안 거쳐서 다른 setState(roast pile 등)와의
+      // batch/timing 충돌 없이 매끄러움.
+      if (myCharRef.current) {
+        myCharRef.current.style.transform = `translate(${motion.dx}px, ${
+          -(motion.dy + motion.yJump)
+        }px)`;
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+      cancelAnimationFrame(raf);
+    };
+  }, []);
+
   // === poke fire (easter egg: tap the campfire to roast faster) ===
   const pokeFire = useCallback(() => {
     AudioEngine.ensure();
@@ -631,34 +761,55 @@ export function BonfireScene() {
 
       {/* Silhouettes — 토글로 숨길 수 있음 */}
       <div className={styles.silhouettes} style={{ opacity: showPeople ? 1 : 0, transition: 'opacity 0.4s ease' }}>
-        {silhouettes.map((s, i) => (
-          <div
-            key={s.id}
-            className={styles.silhouette}
-            style={{
-              left: `calc(${s.x}% - 40px)`,
-              bottom: s.y + 'px',
-              transform: s.flip ? 'scaleX(-1)' : 'none',
-            }}
-          >
+        {silhouettes.map((s, i) => {
+          const isMine = i === mySilhouetteIdx;
+          // 본인은 flip 무시 (정면 유지) — translate 와 scaleX 합성 시 좌우 부호 헷갈림 제거.
+          const otherTransform = s.flip ? 'scaleX(-1)' : 'none';
+          return (
             <div
-              className={styles.silhouetteNick}
-              style={{ transform: `translateX(-50%) ${s.flip ? 'scaleX(-1)' : ''}` }}
+              key={s.id}
+              ref={isMine ? myCharRef : undefined}
+              className={styles.silhouette}
+              style={{
+                left: `calc(${s.x}% - 40px)`,
+                bottom: s.y + 'px',
+                // 본인은 transform key 자체를 안 줌 — ref 가 매 프레임 직접 갱신.
+                // 다른 사람은 React 가 flip 만 set.
+                ...(isMine
+                  ? { zIndex: 20, transition: 'none' }
+                  : { transform: otherTransform }),
+              }}
             >
-              {s.nick.slice(0, 16)}
-            </div>
-            <PersonSilhouette variant={s.variant} scale={s.scale} />
-            {activeBubbles[i] && (
               <div
-                className={styles.silhouetteBubble}
-                key={activeBubbles[i].key}
-                style={{ transform: `translateX(-50%) ${s.flip ? 'scaleX(-1)' : ''}` }}
+                className={styles.silhouetteNick}
+                style={{
+                  transform: `translateX(-50%) ${s.flip ? 'scaleX(-1)' : ''}`,
+                  ...(isMine ? { color: '#ffd590', fontWeight: 600 } : {}),
+                }}
               >
-                {activeBubbles[i].text}
+                {isMine ? `${s.nick.slice(0, 12)} (나)` : s.nick.slice(0, 16)}
               </div>
-            )}
-          </div>
-        ))}
+              <div
+                style={
+                  isMine
+                    ? { filter: 'drop-shadow(0 0 8px rgba(255,213,144,0.55))' }
+                    : undefined
+                }
+              >
+                <PersonSilhouette variant={s.variant} scale={s.scale} />
+              </div>
+              {activeBubbles[i] && (
+                <div
+                  className={styles.silhouetteBubble}
+                  key={activeBubbles[i].key}
+                  style={{ transform: `translateX(-50%) ${s.flip ? 'scaleX(-1)' : ''}` }}
+                >
+                  {activeBubbles[i].text}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Fire glow */}
