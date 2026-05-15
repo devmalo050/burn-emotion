@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Campfire } from '@/components/Campfire/Campfire';
 import { SweetPotato } from '@/components/SweetPotato/SweetPotato';
 import { PersonSilhouette } from '@/components/PersonSilhouette/PersonSilhouette';
-import { StarrySky, makeStars } from '@/components/StarrySky/StarrySky';
+import { StarrySky, makeStars, type Star } from '@/components/StarrySky/StarrySky';
 import { NightField } from '@/components/NightField/NightField';
 import { makeNickname } from '@/lib/nickname';
 import { PLACEHOLDER_LINES } from '@/lib/data/placeholder-lines';
@@ -124,10 +124,12 @@ export function BonfireScene() {
   const [lastScoreSec, setLastScoreSec] = useState<number | null>(null);
   // 별 클릭으로 리더보드만 따로 열기 (게임 안 시작).
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
-  // 하늘의 별 데이터 — StarrySky 와 게임(100초 burst)가 공유.
+  // 하늘의 별 데이터 — StarrySky 와 게임 burst 가 공유.
   const skyStars = useMemo(() => makeStars(180), []);
-  // 100초 burst 시 별들이 별똥별로 변환됐다는 의미로 별 표시 숨김.
-  const [skyStarsHidden, setSkyStarsHidden] = useState(false);
+  // 50초/100초 burst 로 떨어진 별 id 집합. 떨어진 별은 표시 안 함.
+  const [hiddenStarIds, setHiddenStarIds] = useState<ReadonlySet<number>>(
+    () => new Set<number>(),
+  );
   const meteorIdRef = useRef(1);
 
   const fireRef = useRef<HTMLDivElement | null>(null);
@@ -579,7 +581,14 @@ export function BonfireScene() {
     const startAt = performance.now();
     let last = startAt;
     let lastSpawn = startAt;
-    let starRained = false;
+    // 50초 burst (별 30%) / 100초 burst (나머지 70%) — 두 단계 폭우.
+    let burst50 = false;
+    let burst100 = false;
+    // 게임 시작 시점에 어떤 별이 50초에 떨어질지 미리 셔플로 결정.
+    const shuffled = [...skyStars].sort(() => Math.random() - 0.5);
+    const fallFirstIds = new Set<number>(
+      shuffled.slice(0, Math.floor(skyStars.length * 0.3)).map((s) => s.id),
+    );
     const list: Meteor[] = [];
 
     const loop = (now: number) => {
@@ -588,28 +597,50 @@ export function BonfireScene() {
       const elapsed = now - startAt;
       setSurvivedMs(elapsed);
 
-      // === 100초 돌파 시 — 하늘에 떠 있던 별들이 그 자리에서 별똥별로 변환되어 떨어짐 ===
-      // StarrySky 가 그리는 별 좌표(%, StarrySky 컨테이너=화면 width 100%, height 60% 기준)를
-      // 화면 절대 좌표로 변환해서 그 위치에서 시작하는 meteor 생성.
-      // 동시에 skyStarsHidden=true 로 표시상 별 제거 → 시각적으로 "별이 떨어진다".
-      if (!starRained && elapsed >= 100000) {
-        starRained = true;
+      // === 50초 — 하늘의 별 30% 가 그 자리에서 별똥별로 변환되어 떨어짐 ===
+      // === 100초 — 나머지 70% 가 같은 방식으로 떨어짐 ===
+      // 별 좌표(%, StarrySky 컨테이너=화면 width 100%, height 60% 기준)를 화면 절대 좌표로
+      // 변환해 그 위치에서 meteor 시작. 동시에 떨어진 별의 id 를 hiddenStarIds 에 추가해서
+      // 시각적으로 "별이 떨어졌다" 표현.
+      const dropStars = (
+        starsToDrop: Star[],
+        timeAtMs: number,
+      ) => {
         const sw = window.innerWidth;
         const sh = window.innerHeight;
-        const skyH = sh * 0.6; // StarrySky height
-        // 일반 spawn 의 vy = 0.45 + r*0.4 + (elapsed/70000) 와 동일 식 — elapsed 만 100초로 강제.
-        // 디버그로 burst 시점을 앞당겨도 별 속도는 100초 시점 수준 유지.
-        const burstSpeedBoost = 100000 / 70000;
-        for (const s of skyStars) {
+        const skyH = sh * 0.6;
+        const speedBoost = timeAtMs / 70000;
+        const droppedIds: number[] = [];
+        for (const s of starsToDrop) {
           list.push({
             id: meteorIdRef.current++,
             x: (s.x / 100) * sw,
             y: (s.y / 100) * skyH,
             vx: (Math.random() - 0.5) * 0.25,
-            vy: 0.45 + Math.random() * 0.4 + burstSpeedBoost,
+            vy: 0.45 + Math.random() * 0.4 + speedBoost,
           });
+          droppedIds.push(s.id);
         }
-        setSkyStarsHidden(true);
+        setHiddenStarIds((prev) => {
+          const next = new Set(prev);
+          for (const id of droppedIds) next.add(id);
+          return next;
+        });
+      };
+
+      if (!burst50 && elapsed >= 50000) {
+        burst50 = true;
+        dropStars(
+          skyStars.filter((s) => fallFirstIds.has(s.id)),
+          50000,
+        );
+      }
+      if (!burst100 && elapsed >= 100000) {
+        burst100 = true;
+        dropStars(
+          skyStars.filter((s) => !fallFirstIds.has(s.id)),
+          100000,
+        );
       }
 
       // === 난이도 곡선 — 점점 빨라짐 ===
@@ -711,7 +742,7 @@ export function BonfireScene() {
       setGameState('idle');
       setMeteors([]);
       setLastScoreSec(null);
-      setSkyStarsHidden(false); // 100초 burst 로 떨어진 별 복원
+      setHiddenStarIds(new Set()); // burst 로 떨어진 별 복원
     }
     setLeaderboardOpen(false);
   }, [gameState]);
@@ -987,7 +1018,7 @@ export function BonfireScene() {
     <div className="stage">
       <StarrySky
         stars={skyStars}
-        starsHidden={skyStarsHidden}
+        hiddenStarIds={hiddenStarIds}
         onMoonClick={startMeteorGame}
         onLeaderboardClick={openLeaderboardModal}
       />

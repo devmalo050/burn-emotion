@@ -32,12 +32,12 @@ export function makeStars(n = 180): Star[] {
 
 interface Props {
   stars?: Star[];
-  starsHidden?: boolean;
+  hiddenStarIds?: ReadonlySet<number>;
   onMoonClick?: () => void;
   onLeaderboardClick?: () => void;
 }
 
-export function StarrySky({ stars, starsHidden, onMoonClick, onLeaderboardClick }: Props = {}) {
+export function StarrySky({ stars, hiddenStarIds, onMoonClick, onLeaderboardClick }: Props = {}) {
   // props 없으면 자체 생성 (다른 곳에서도 사용 가능하게).
   const ownStars = useMemo<Star[]>(() => (stars ? [] : makeStars()), [stars]);
   const list = stars ?? ownStars;
@@ -58,8 +58,9 @@ export function StarrySky({ stars, starsHidden, onMoonClick, onLeaderboardClick 
         role={onLeaderboardClick ? 'button' : undefined}
         aria-label={onLeaderboardClick ? '별똥별 리더보드 열기' : undefined}
       />
-      {!starsHidden &&
-        list.map((s) => (
+      {list.map((s) => {
+        if (hiddenStarIds?.has(s.id)) return null;
+        return (
           <div
             key={s.id}
             className={`${styles.starDot} ${s.blink ? styles.blink : ''}`}
@@ -73,7 +74,8 @@ export function StarrySky({ stars, starsHidden, onMoonClick, onLeaderboardClick 
               animationDelay: `${s.delay}s`,
             }}
           />
-        ))}
+        );
+      })}
     </div>
   );
 }
