@@ -22,6 +22,46 @@
   background: radial-gradient(circle, #fff5d8 0%, #f5e4b0 60%, #d8c280 100%);
   border-radius: 50%;
   box-shadow: 0 0 1px rgba(0, 0, 0, 0.2) inset;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.moon:hover {
+  transform: scale(1.18);
+  box-shadow: 0 0 18px rgba(255, 240, 200, 0.7);
+}
+
+/* 리더보드 트리거 — 5각별 모양 + 잔잔히 빛남 */
+.landmarkStar {
+  position: absolute;
+  /* 달의 오른쪽 아래에 살짝 붙는 위치 */
+  right: calc(14% - 22px);
+  top: calc(16% + 14px);
+  width: 12px;
+  height: 12px;
+  background: #fff5e8;
+  clip-path: polygon(
+    50% 0%, 61% 35%, 98% 35%, 68% 57%,
+    79% 91%, 50% 70%, 21% 91%, 32% 57%,
+    2% 35%, 39% 35%
+  );
+  filter:
+    drop-shadow(0 0 4px rgba(255, 245, 220, 0.95))
+    drop-shadow(0 0 10px rgba(255, 213, 144, 0.55));
+  pointer-events: auto;
+  cursor: pointer;
+  transition: transform 0.2s ease, filter 0.2s ease;
+  animation: landmarkStarPulse 3.2s ease-in-out infinite;
+}
+.landmarkStar:hover {
+  transform: scale(1.35) rotate(8deg);
+  filter:
+    drop-shadow(0 0 6px rgba(255, 245, 220, 1))
+    drop-shadow(0 0 16px rgba(255, 213, 144, 0.9));
+}
+@keyframes landmarkStarPulse {
+  0%, 100% { opacity: 0.65; }
+  50% { opacity: 1; }
 }
 .moonGlow {
   position: absolute;
