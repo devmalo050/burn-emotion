@@ -3,8 +3,10 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Campfire } from '@/components/Campfire/Campfire';
 import { SweetPotato } from '@/components/SweetPotato/SweetPotato';
 import { PersonSilhouette } from '@/components/PersonSilhouette/PersonSilhouette';
-import { StarrySky, makeStars, type Star } from '@/components/StarrySky/StarrySky';
+import { StarrySky, makeStars } from '@/components/StarrySky/StarrySky';
 import { NightField } from '@/components/NightField/NightField';
+import { useMeteorGame } from '@/components/MeteorGame/useMeteorGame';
+import { MeteorOverlay } from '@/components/MeteorGame/MeteorOverlay';
 import { makeNickname } from '@/lib/nickname';
 import { PLACEHOLDER_LINES } from '@/lib/data/placeholder-lines';
 import { COMFORT_LINES, type ComfortLine } from '@/lib/data/comfort-lines';
@@ -112,25 +114,12 @@ export function BonfireScene() {
     keys: new Set<string>(),
   });
 
-  // === 별똥별 피하기 이스터에그 ===
-  type GameState = 'idle' | 'countdown' | 'playing' | 'gameover';
-  type Meteor = { id: number; x: number; y: number; vx: number; vy: number };
-  type LeaderEntry = { nick: string; seconds: number };
-  const [gameState, setGameState] = useState<GameState>('idle');
-  const [countdownNum, setCountdownNum] = useState(3);
-  const [survivedMs, setSurvivedMs] = useState(0);
-  const [meteors, setMeteors] = useState<Meteor[]>([]);
-  const [leaderboard, setLeaderboard] = useState<LeaderEntry[]>([]);
-  const [lastScoreSec, setLastScoreSec] = useState<number | null>(null);
-  // 별 클릭으로 리더보드만 따로 열기 (게임 안 시작).
-  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
-  // 하늘의 별 데이터 — StarrySky 와 게임 burst 가 공유.
+  // 하늘의 별 데이터 — StarrySky 와 별똥별 게임 burst 가 공유.
   const skyStars = useMemo(() => makeStars(180), []);
   // 50초/100초 burst 로 떨어진 별 id 집합. 떨어진 별은 표시 안 함.
   const [hiddenStarIds, setHiddenStarIds] = useState<ReadonlySet<number>>(
     () => new Set<number>(),
   );
-  const meteorIdRef = useRef(1);
 
   const fireRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -178,6 +167,15 @@ export function BonfireScene() {
       joinedAt: Date.now(),
     };
   }
+
+  // === 별똥별 게임 (이스터에그) — 훅에 다 위임 ===
+  const meteor = useMeteorGame({
+    myNick,
+    spotRef: mySpotRef,
+    motionRef,
+    skyStars,
+    setHiddenStarIds,
+  });
 
   // === spawn potato AT the fire — stable slot so existing potatoes
   // don't reshuffle. At max capacity, only replace an already-cracked
@@ -539,7 +537,7 @@ export function BonfireScene() {
   // 슬래시는 입력값에 그대로 prefix 추가해서 "/별똥별" 같은 슬래시 커맨드 자연스럽게 시작.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (gameState !== 'idle') return;
+      if (meteor.gameState !== 'idle') return;
       if (document.activeElement === inputRef.current) return;
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -555,213 +553,7 @@ export function BonfireScene() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [gameState]);
-
-  // === EASTER EGG: 별똥별 피하기 게임 ===
-  // countdown 3초 → playing (별똥별 spawn + 충돌 판정) → gameover (TOP10 + 자동 idle 복귀).
-  useEffect(() => {
-    if (gameState !== 'countdown') return;
-    setCountdownNum(3);
-    let n = 3;
-    const id = setInterval(() => {
-      n -= 1;
-      if (n <= 0) {
-        clearInterval(id);
-        setGameState('playing');
-      } else {
-        setCountdownNum(n);
-      }
-    }, 1000);
-    return () => clearInterval(id);
-  }, [gameState]);
-
-  useEffect(() => {
-    if (gameState !== 'playing') return;
-    let raf = 0;
-    const startAt = performance.now();
-    let last = startAt;
-    let lastSpawn = startAt;
-    // 50초 burst (별 30%) / 100초 burst (나머지 70%) — 두 단계 폭우.
-    let burst50 = false;
-    let burst100 = false;
-    // 게임 시작 시점에 어떤 별이 50초에 떨어질지 미리 셔플로 결정.
-    const shuffled = [...skyStars].sort(() => Math.random() - 0.5);
-    const fallFirstIds = new Set<number>(
-      shuffled.slice(0, Math.floor(skyStars.length * 0.3)).map((s) => s.id),
-    );
-    const list: Meteor[] = [];
-
-    const loop = (now: number) => {
-      const dt = Math.min(50, now - last);
-      last = now;
-      const elapsed = now - startAt;
-      setSurvivedMs(elapsed);
-
-      // === 50초 — 하늘의 별 30% 가 그 자리에서 별똥별로 변환되어 떨어짐 ===
-      // === 100초 — 나머지 70% 가 같은 방식으로 떨어짐 ===
-      // 별 좌표(%, StarrySky 컨테이너=화면 width 100%, height 60% 기준)를 화면 절대 좌표로
-      // 변환해 그 위치에서 meteor 시작. 동시에 떨어진 별의 id 를 hiddenStarIds 에 추가해서
-      // 시각적으로 "별이 떨어졌다" 표현.
-      const dropStars = (
-        starsToDrop: Star[],
-        timeAtMs: number,
-      ) => {
-        const sw = window.innerWidth;
-        const sh = window.innerHeight;
-        const skyH = sh * 0.6;
-        const speedBoost = timeAtMs / 70000;
-        const droppedIds: number[] = [];
-        for (const s of starsToDrop) {
-          list.push({
-            id: meteorIdRef.current++,
-            x: (s.x / 100) * sw,
-            y: (s.y / 100) * skyH,
-            vx: (Math.random() - 0.5) * 0.25,
-            vy: 0.45 + Math.random() * 0.4 + speedBoost,
-          });
-          droppedIds.push(s.id);
-        }
-        setHiddenStarIds((prev) => {
-          const next = new Set(prev);
-          for (const id of droppedIds) next.add(id);
-          return next;
-        });
-      };
-
-      if (!burst50 && elapsed >= 50000) {
-        burst50 = true;
-        dropStars(
-          skyStars.filter((s) => fallFirstIds.has(s.id)),
-          50000,
-        );
-      }
-      if (!burst100 && elapsed >= 100000) {
-        burst100 = true;
-        dropStars(
-          skyStars.filter((s) => !fallFirstIds.has(s.id)),
-          100000,
-        );
-      }
-
-      // === 난이도 곡선 — 점점 빨라짐 ===
-      // spawn 간격: 1100ms 에서 시작 → 30초 후 220ms 까지 빠르게.
-      const spawnInterval = Math.max(220, 1100 - elapsed * 0.029);
-      // 별똥별 낙하 속도: 0.45 ~ 0.85 px/ms 에서 시작, 시간 갈수록 가속.
-      const speedBoost = elapsed / 70000; // 70초 후 +1.0 px/ms
-      if (now - lastSpawn > spawnInterval) {
-        lastSpawn = now;
-        // 화면 너비 보정 — 와이드 모니터에서도 별똥별 밀도 유지.
-        // 1100px(=silhouettes 컨테이너 너비) 기준 1개, 그 이상 비례.
-        const widthFactor = Math.max(1, Math.round(window.innerWidth / 1100));
-        for (let k = 0; k < widthFactor; k++) {
-          const id = meteorIdRef.current++;
-          list.push({
-            id,
-            x: Math.random() * window.innerWidth,
-            y: -40,
-            vx: (Math.random() - 0.5) * 0.25,
-            vy: 0.45 + Math.random() * 0.4 + speedBoost,
-          });
-        }
-      }
-
-      // 별똥별 이동 + 화면 밖 제거
-      const sh = window.innerHeight;
-      for (let i = list.length - 1; i >= 0; i--) {
-        const m = list[i];
-        m.x += m.vx * dt;
-        m.y += m.vy * dt;
-        if (m.y > sh + 60) list.splice(i, 1);
-      }
-
-      // === 충돌 판정 ===
-      const spot = mySpotRef.current;
-      if (spot) {
-        const sw = window.innerWidth;
-        const cw = Math.min(1100, sw);
-        const containerLeft = (sw - cw) / 2;
-        const containerBottom = 180;
-        const m = motionRef.current;
-        const charScreenX = containerLeft + (spot.x / 100) * cw + m.dx;
-        // 캐릭터 중심 y (top 기준) — silhouette 컨테이너 bottom + spot.y + dy + yJump 만큼 위로
-        // 거기서 캐릭터 높이 절반(~40px) 위가 중심.
-        const charBottomFromTop = sh - (containerBottom + spot.y + m.dy + m.yJump);
-        const charCenterY = charBottomFromTop - 40;
-        const HIT_RADIUS = 28;
-        for (const met of list) {
-          const dxh = met.x - charScreenX;
-          const dyh = met.y - charCenterY;
-          if (dxh * dxh + dyh * dyh < HIT_RADIUS * HIT_RADIUS) {
-            // 게임 종료
-            setLastScoreSec(elapsed / 1000);
-            setGameState('gameover');
-            return;
-          }
-        }
-      }
-
-      setMeteors([...list]);
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-    // skyStars 는 mount 시 한 번 생성된 정적 배열이라 deps 추가 안 해도 안전.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameState]);
-
-  // === gameover 처리: RPC 로 기록 제출 + TOP10 fetch. 닫기는 사용자가 X 버튼으로. ===
-  useEffect(() => {
-    if (gameState !== 'gameover') return;
-    let cancelled = false;
-    const sec = lastScoreSec ?? 0;
-    const supabase = getSupabase();
-    if (supabase) {
-      void supabase
-        .rpc('submit_meteor_record', { p_nick: myNick, p_seconds: Number(sec.toFixed(2)) })
-        .then(({ data, error }) => {
-          if (cancelled) return;
-          if (error || !Array.isArray(data)) {
-            void supabase.rpc('get_meteor_top10').then(({ data: d2 }) => {
-              if (cancelled || !Array.isArray(d2)) return;
-              setLeaderboard(d2 as LeaderEntry[]);
-            });
-            return;
-          }
-          setLeaderboard(data as LeaderEntry[]);
-        });
-    }
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameState]);
-
-  // === 결과/리더보드 모달 닫기 ===
-  const closeMeteorModal = useCallback(() => {
-    if (gameState === 'gameover') {
-      setGameState('idle');
-      setMeteors([]);
-      setLastScoreSec(null);
-      setHiddenStarIds(new Set()); // burst 로 떨어진 별 복원
-    }
-    setLeaderboardOpen(false);
-  }, [gameState]);
-
-  // === mount 시 TOP10 fetch — idle 화면에서 상시 표시 ===
-  useEffect(() => {
-    if (!isSupabaseConfigured()) return;
-    const supabase = getSupabase();
-    if (!supabase) return;
-    let cancelled = false;
-    void supabase.rpc('get_meteor_top10').then(({ data, error }) => {
-      if (cancelled || error || !Array.isArray(data)) return;
-      setLeaderboard(data as LeaderEntry[]);
-    });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [meteor.gameState]);
 
   // === EASTER EGG: 방향키 이동 + 스페이스바 점프 ===
   // 본인 화면에서만 (presence 업데이트 안 함). 채팅 입력창 blur 일 때만 키 인식.
@@ -919,39 +711,15 @@ export function BonfireScene() {
     }
   }, []);
 
-  // === 별똥별 게임 시작 ===
-  const startMeteorGame = useCallback(() => {
-    if (gameState !== 'idle') return;
-    setLastScoreSec(null);
-    setMeteors([]);
-    setSurvivedMs(0);
-    setCountdownNum(3);
-    setGameState('countdown');
-  }, [gameState]);
-
-  // === 리더보드만 열기 (별 클릭) — 게임 안 시작. fresh fetch 후 모달 열림. ===
-  const openLeaderboardModal = useCallback(() => {
-    if (gameState !== 'idle') return;
-    setLastScoreSec(null);
-    setLeaderboardOpen(true);
-    if (!isSupabaseConfigured()) return;
-    const supabase = getSupabase();
-    if (!supabase) return;
-    void supabase.rpc('get_meteor_top10').then(({ data, error }) => {
-      if (error || !Array.isArray(data)) return;
-      setLeaderboard(data as LeaderEntry[]);
-    });
-  }, [gameState]);
-
   const submit = useCallback(
     (e?: React.FormEvent) => {
       e?.preventDefault?.();
       const text = draftMessage.trim();
       if (!text) return;
       // === /별똥별 — 게임 트리거 (다른 사람한테 broadcast 안 함, 피드에도 안 띄움) ===
-      if (text === '/별똥별' && gameState === 'idle') {
+      if (text === '/별똥별' && meteor.gameState === 'idle') {
         setDraftMessage('');
-        startMeteorGame();
+        meteor.start();
         return;
       }
       // === 도배 방지 — 5초 내 10번 이상만 차단 ===
@@ -1009,7 +777,7 @@ export function BonfireScene() {
         );
       }, 6500);
     },
-    [draftMessage, myNick, silhouettes, mySilhouetteIdx, spawnPotatoAtFire, gameState, startMeteorGame],
+    [draftMessage, myNick, silhouettes, mySilhouetteIdx, spawnPotatoAtFire, meteor],
   );
 
   const fireIntensity = Math.min(1.5, 0.85 + pile.length * 0.04);
@@ -1019,8 +787,8 @@ export function BonfireScene() {
       <StarrySky
         stars={skyStars}
         hiddenStarIds={hiddenStarIds}
-        onMoonClick={startMeteorGame}
-        onLeaderboardClick={openLeaderboardModal}
+        onMoonClick={meteor.start}
+        onLeaderboardClick={meteor.openLeaderboard}
       />
       <NightField />
       <div className={styles.fogLayer} />
@@ -1264,325 +1032,7 @@ export function BonfireScene() {
 
       <div className={styles.grain} />
 
-      {/* === 별똥별 게임 오버레이 === */}
-      {gameState !== 'idle' && (
-        <>
-          {/* 별똥별 — fixed 좌표로 화면 어디든 그림 */}
-          {meteors.map((m) => {
-            const angle = Math.atan2(m.vy, m.vx) * (180 / Math.PI);
-            return (
-              <div
-                key={m.id}
-                style={{
-                  position: 'fixed',
-                  left: m.x,
-                  top: m.y,
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  background: '#fff7d6',
-                  boxShadow:
-                    '0 0 16px 6px rgba(255,213,144,0.75), 0 0 32px 10px rgba(255,140,58,0.35)',
-                  transform: 'translate(-50%, -50%)',
-                  pointerEvents: 'none',
-                  zIndex: 90,
-                }}
-              >
-                <div
-                  style={{
-                    position: 'absolute',
-                    width: 2,
-                    height: 56,
-                    background:
-                      'linear-gradient(0deg, transparent, rgba(255,213,144,0.8))',
-                    top: '50%',
-                    left: '50%',
-                    transformOrigin: '50% 0%',
-                    // 꼬리는 별 진행 반대 방향 — 별이 아래로 떨어지면 꼬리는 위로.
-                    transform: `translate(-50%, 0) rotate(${angle + 90}deg)`,
-                  }}
-                />
-              </div>
-            );
-          })}
-
-          {/* 게임 중 상단 timer */}
-          {gameState === 'playing' && (
-            <div
-              style={{
-                position: 'fixed',
-                top: 24,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                color: '#ffd590',
-                fontSize: 42,
-                fontWeight: 700,
-                letterSpacing: '0.06em',
-                textShadow:
-                  '0 2px 12px rgba(0,0,0,0.7), 0 0 24px rgba(255,140,58,0.3)',
-                zIndex: 95,
-                pointerEvents: 'none',
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            >
-              {(survivedMs / 1000).toFixed(1)}초
-            </div>
-          )}
-
-          {/* 카운트다운 */}
-          {gameState === 'countdown' && (
-            <div
-              style={{
-                position: 'fixed',
-                inset: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 36,
-                background: 'rgba(0,0,0,0.35)',
-                zIndex: 92,
-                pointerEvents: 'none',
-              }}
-            >
-              <div
-                key={countdownNum}
-                style={{
-                  fontSize: 200,
-                  fontWeight: 800,
-                  color: '#ffd590',
-                  lineHeight: 1,
-                  textShadow:
-                    '0 8px 40px rgba(0,0,0,0.8), 0 0 60px rgba(255,140,58,0.4)',
-                  animation: 'meteorCountdownPulse 1s ease-out',
-                }}
-              >
-                {countdownNum}
-              </div>
-
-              {/* 조작 가이드 — 한 줄 배치 */}
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 40,
-                  color: 'rgba(239,232,217,0.85)',
-                  fontSize: 14,
-                  letterSpacing: '0.04em',
-                }}
-              >
-                {/* 방향키 + 라벨 */}
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 10,
-                  }}
-                >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                      <div style={meteorKeyEmpty} />
-                      <div style={meteorKeyStyle}>↑</div>
-                      <div style={meteorKeyEmpty} />
-                    </div>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      <div style={meteorKeyStyle}>←</div>
-                      <div style={meteorKeyStyle}>↓</div>
-                      <div style={meteorKeyStyle}>→</div>
-                    </div>
-                  </div>
-                  <span>이동</span>
-                </div>
-
-                {/* 스페이스바 + 라벨 */}
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 10,
-                  }}
-                >
-                  <div
-                    style={{
-                      ...meteorKeyStyle,
-                      width: 168,
-                      fontSize: 12,
-                      letterSpacing: '0.16em',
-                    }}
-                  >
-                    SPACE
-                  </div>
-                  <span>점프</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-        </>
-      )}
-
-      {/* === 결과/리더보드 모달 — gameover (게임 끝) 또는 별 클릭(leaderboardOpen) === */}
-      {(gameState === 'gameover' || leaderboardOpen) && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(0,0,0,0.55)',
-            zIndex: 96,
-            animation: 'meteorOverlayIn 0.4s ease-out',
-          }}
-          onClick={closeMeteorModal}
-        >
-          <div
-            style={{
-              position: 'relative',
-              background:
-                'linear-gradient(180deg, rgba(28,16,32,0.96), rgba(12,8,16,0.96))',
-              border: '1px solid rgba(255,213,144,0.25)',
-              borderRadius: 16,
-              padding: '40px 48px',
-              minWidth: 360,
-              maxWidth: 520,
-              color: '#efe8d9',
-              textAlign: 'center',
-              boxShadow:
-                '0 24px 80px rgba(0,0,0,0.6), 0 0 60px rgba(255,140,58,0.12)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* X 닫기 */}
-            <button
-              type="button"
-              onClick={closeMeteorModal}
-              aria-label="닫기"
-              style={{
-                position: 'absolute',
-                top: 12,
-                right: 12,
-                width: 28,
-                height: 28,
-                border: 'none',
-                background: 'transparent',
-                color: 'rgba(239,232,217,0.6)',
-                fontSize: 20,
-                lineHeight: 1,
-                cursor: 'pointer',
-                borderRadius: 6,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.color = '#efe8d9';
-                (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.08)';
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.color = 'rgba(239,232,217,0.6)';
-                (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
-              }}
-            >
-              ×
-            </button>
-
-            {gameState === 'gameover' ? (
-              <>
-                <div style={{ fontSize: 14, opacity: 0.7, letterSpacing: '0.12em' }}>
-                  RESULT
-                </div>
-                <div
-                  style={{
-                    fontSize: 56,
-                    fontWeight: 700,
-                    color: '#ffd590',
-                    margin: '12px 0 24px',
-                    fontVariantNumeric: 'tabular-nums',
-                  }}
-                >
-                  {(lastScoreSec ?? 0).toFixed(2)}초
-                </div>
-              </>
-            ) : (
-              <div
-                style={{
-                  fontSize: 18,
-                  fontWeight: 600,
-                  color: '#ffd590',
-                  margin: '4px 0 24px',
-                  letterSpacing: '0.04em',
-                }}
-              >
-                별똥별 피하기
-              </div>
-            )}
-
-            <div
-              style={{
-                fontSize: 13,
-                letterSpacing: '0.12em',
-                opacity: 0.7,
-                marginBottom: 10,
-              }}
-            >
-              TOP 10
-            </div>
-            <div style={{ textAlign: 'left' }}>
-              {leaderboard.length === 0 && (
-                <div style={{ fontSize: 13, opacity: 0.5, textAlign: 'center', padding: '8px 0' }}>
-                  {gameState === 'gameover' ? '불러오는 중...' : '아직 도전자 없음'}
-                </div>
-              )}
-              {leaderboard.map((row, i) => {
-                const isMe = row.nick === myNick;
-                const sec =
-                  typeof row.seconds === 'number'
-                    ? row.seconds
-                    : parseFloat(String(row.seconds));
-                return (
-                  <div
-                    key={i}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      padding: '6px 12px',
-                      borderRadius: 6,
-                      background: isMe ? 'rgba(255,213,144,0.12)' : 'transparent',
-                      color: isMe ? '#ffd590' : '#efe8d9',
-                      fontWeight: isMe ? 600 : 400,
-                      fontSize: 14,
-                    }}
-                  >
-                    <span style={{ opacity: 0.6, width: 28 }}>{i + 1}</span>
-                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {row.nick}
-                    </span>
-                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-                      {sec.toFixed(2)}초
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <style>{`
-        @keyframes meteorCountdownPulse {
-          0% { transform: scale(0.4); opacity: 0; }
-          30% { transform: scale(1.15); opacity: 1; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-        @keyframes meteorOverlayIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-      `}</style>
+      <MeteorOverlay api={meteor} myNick={myNick} />
     </div>
   );
 }
