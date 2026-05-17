@@ -154,13 +154,13 @@
   height: 80px;
   pointer-events: none;
 }
-/* stage 직접 자식 버전 — CampfireFlames(z 12~16) 위에 떠 있도록 z 50.
-   bonfireZone 의 transform stacking 영향 없이 stage 레벨에서 평가. */
+/* stage 직접 자식 버전 — 각 potato 가 inline z-index 17~20 으로 직접 평가되어야 하므로
+   container 자체에 z-index 명시 안 함 (없으면 자식 z 가 stage 레벨에 도달).
+   결과: 통나무(5) < 불꽃(14~16) < 고구마(17~20) < 캐릭터 앞(25). 캐릭터 앞이면 모든 위. */
 .potatoRowFloating {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 50;
 }
 .potatoItem {
   position: absolute;

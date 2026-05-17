@@ -931,7 +931,7 @@ export function BonfireScene() {
               style={{
                 left: `calc(50% + ${slot.x}px)`,
                 bottom: `${270 + slot.y}px`,
-                zIndex: 50 + slot.z,
+                zIndex: 17 + slot.z,
                 transform: `translateX(-50%) rotate(${slot.r}deg) scale(${slot.s})`,
               }}
               title={p.text}
