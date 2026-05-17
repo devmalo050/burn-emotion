@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { seededRandom } from '@/lib/seed-rng';
 
 interface SweetPotatoProps {
@@ -16,7 +17,7 @@ interface SweetPotatoProps {
  * - skin 색은 핑크-로즈에서 노릇한 캐러멜, 까만 숯까지 roastLevel에 따라 보간
  * - 표면에 lenticel(피목), eye(싹눈), 짧은 stretch mark, 뿌리털을 흩뿌림
  */
-export function SweetPotato({
+function SweetPotatoInner({
   size = 70,
   roastLevel = 0,
   cracked = false,
@@ -398,3 +399,15 @@ export function SweetPotato({
     </svg>
   );
 }
+
+// roastLevel 을 5% 단위로 quantize 해서 거의 같은 값이면 re-render skip.
+// 매 RAF 마다 setPile 갱신해도 5% 미만 변화는 같은 시각.
+export const SweetPotato = memo(SweetPotatoInner, (prev, next) => {
+  return (
+    prev.size === next.size &&
+    prev.seed === next.seed &&
+    prev.cracked === next.cracked &&
+    Math.round((prev.roastLevel ?? 0) * 20) === Math.round((next.roastLevel ?? 0) * 20)
+  );
+});
+

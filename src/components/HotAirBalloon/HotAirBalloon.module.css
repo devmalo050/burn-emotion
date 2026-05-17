@@ -1,0 +1,32 @@
+/* 열기구 — SVG 통째로 떠오르는 모션 + 호버 강조 */
+.balloon {
+  position: relative;
+  cursor: pointer;
+  pointer-events: auto;
+  display: inline-block;
+  line-height: 0;
+  filter: drop-shadow(0 6px 18px rgba(255, 140, 60, 0.35));
+  transition: transform 0.25s ease, filter 0.25s ease;
+  animation: balloonFloat 7s ease-in-out infinite;
+}
+.balloon:hover {
+  transform: scale(1.1);
+  filter: drop-shadow(0 8px 26px rgba(255, 180, 90, 0.7));
+  animation-play-state: paused;
+}
+
+/* 버너 불꽃 — 아래(불꽃 베이스) 기준으로 위아래 흔들리며 좌우 살짝 늘어남.
+   transform-origin 으로 불꽃 베이스 고정. */
+.flame {
+  transform-origin: 36px 85px;
+  animation: flameDance 0.45s ease-in-out infinite;
+}
+
+@keyframes balloonFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes flameDance {
+  0%, 100% { transform: scaleY(1) scaleX(1); opacity: 1; }
+  50% { transform: scaleY(1.18) scaleX(0.86); opacity: 0.92; }
+}

@@ -1,0 +1,91 @@
+/* 캠프파이어 불꽃 — Claude Design 핸드오프(Campfire.html) 이식.
+   메탈볼 효과(blur + contrast)로 캔버스 파티클을 흐름처럼 표현.
+   stage 내부 absolute 좌표. 모닥불 위치에 맞춰 px 단위로 조정. */
+
+/* viewport(fixed) 기준 좌표. 모닥불 통나무 위쪽 위치에 맞게 px 조정.
+   silhouettes(bottom 180), bonfireZone(bottom 220) 와 어울리도록 불꽃 base ~280px. */
+
+.flameWrap {
+  position: fixed;
+  left: 50%;
+  bottom: 290px;
+  width: 340px;
+  height: 410px;
+  transform: translateX(-50%);
+  filter: blur(4px) contrast(11) saturate(1.15);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  z-index: 14;
+}
+.flameWrap canvas { width: 100%; height: 100%; display: block; }
+
+.flameCore {
+  position: fixed;
+  left: 50%;
+  bottom: 290px;
+  width: 170px;
+  height: 205px;
+  transform: translateX(-50%);
+  filter: blur(3px) contrast(8);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  z-index: 15;
+}
+.flameCore canvas { width: 100%; height: 100%; display: block; }
+
+.coreGlow {
+  position: fixed;
+  left: 50%;
+  bottom: 290px;
+  width: 200px;
+  height: 120px;
+  transform: translateX(-50%);
+  background: radial-gradient(
+    ellipse at 50% 70%,
+    rgba(255, 210, 120, 0.5),
+    rgba(255, 120, 40, 0.2) 35%,
+    rgba(255, 60, 20, 0) 65%
+  );
+  filter: blur(14px);
+  pointer-events: none;
+  mix-blend-mode: screen;
+  z-index: 13;
+}
+
+.embersBed {
+  position: fixed;
+  left: 50%;
+  bottom: 265px;
+  width: 150px;
+  height: 28px;
+  transform: translateX(-50%);
+  background: radial-gradient(
+    ellipse at 50% 60%,
+    rgba(255, 230, 150, 0.95),
+    rgba(255, 120, 40, 0.55) 30%,
+    rgba(120, 20, 5, 0) 72%
+  );
+  filter: blur(6px);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  z-index: 12;
+  animation: campEmberPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes campEmberPulse {
+  0%, 100% { opacity: 0.85; transform: translateX(-50%) scale(1); }
+  50%      { opacity: 1;    transform: translateX(-50%) scale(1.05); }
+}
+
+/* embers + smoke 캔버스 — viewport 전체 깔림 */
+.embersCanvas,
+.smokeCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 16;
+}
+.smokeCanvas { mix-blend-mode: screen; opacity: 0.5; }
+.embersCanvas { mix-blend-mode: screen; }

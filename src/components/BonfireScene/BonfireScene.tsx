@@ -7,6 +7,11 @@ import { StarrySky, makeStars } from '@/components/StarrySky/StarrySky';
 import { NightField } from '@/components/NightField/NightField';
 import { useMeteorGame } from '@/components/MeteorGame/useMeteorGame';
 import { MeteorOverlay } from '@/components/MeteorGame/MeteorOverlay';
+import { HotAirBalloon } from '@/components/HotAirBalloon/HotAirBalloon';
+import {
+  CampfireFlames,
+  type CampfireFlamesHandle,
+} from '@/components/CampfireFlames/CampfireFlames';
 import { makeNickname } from '@/lib/nickname';
 import { PLACEHOLDER_LINES } from '@/lib/data/placeholder-lines';
 import { COMFORT_LINES, type ComfortLine } from '@/lib/data/comfort-lines';
@@ -18,7 +23,6 @@ import type {
   PotatoState,
   SilhouetteEntity,
   ActiveBubble,
-  EmberParticle,
 } from '@/lib/types';
 import styles from './BonfireScene.module.css';
 
@@ -86,7 +90,6 @@ function randomSpot(): { x: number; y: number; scale: number; flip: boolean } {
 export function BonfireScene() {
   const [feedMessages, setFeedMessages] = useState<ChatMessage[]>([]);
   const [comfortMsg, setComfortMsg] = useState<(ComfortLine & { key: number }) | null>(null);
-  const [embers, setEmbers] = useState<EmberParticle[]>([]);
   const [shake, setShake] = useState(false);
   const [muted, setMuted] = useState(true);
   const [showPeople, setShowPeople] = useState(true);
@@ -123,6 +126,8 @@ export function BonfireScene() {
 
   const fireRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  // 캠프파이어 불꽃(캔버스) ref — 모닥불 클릭 시 splash 트리거
+  const campfireFlamesRef = useRef<CampfireFlamesHandle | null>(null);
   // 도배 방지용 — 마지막 보낸 메시지 텍스트와 시각, 직전 N초 내 보낸 횟수
   const lastSentRef = useRef<{ text: string; at: number; recent: number[] }>({
     text: '',
@@ -132,7 +137,6 @@ export function BonfireScene() {
   const [throttleNotice, setThrottleNotice] = useState<string | null>(null);
   const messageIdRef = useRef(1);
   const potatoIdRef = useRef(1);
-  const emberIdRef = useRef(1);
   // 본인이 spawn한 고구마 id들 — 익으면 inc_burned() RPC 발사 후 set에서 제거.
   // 다른 사람이 보낸 메시지로 spawn된 고구마는 여기 안 들어가서 우리가 카운트 안 함
   // (그쪽 sender가 카운트). 결과적으로 메시지 1개당 정확히 1번 카운트.
@@ -441,30 +445,7 @@ export function BonfireScene() {
     return () => clearInterval(t);
   }, []);
 
-  // === embers — 활활 타오르는 모닥불에서 빈번하게 솟구침 ===
-  useEffect(() => {
-    const removalTimers = new Set<ReturnType<typeof setTimeout>>();
-    const t = setInterval(() => {
-      const id = emberIdRef.current++;
-      const newEmber: EmberParticle = {
-        id,
-        startX: -30 + Math.random() * 60,
-        endX: -80 + Math.random() * 160,
-        endY: -180 - Math.random() * 280,
-        duration: 2400 + Math.random() * 2600,
-      };
-      setEmbers((prev) => [...prev.slice(-30), newEmber]);
-      const removal = setTimeout(() => {
-        setEmbers((prev) => prev.filter((e) => e.id !== id));
-        removalTimers.delete(removal);
-      }, newEmber.duration + 100);
-      removalTimers.add(removal);
-    }, 220);
-    return () => {
-      clearInterval(t);
-      for (const r of removalTimers) clearTimeout(r);
-    };
-  }, []);
+  // embers 솟구침은 CampfireFlames 캔버스가 담당 — 기존 div 기반 ember 시스템 제거.
 
   // === ROAST TICKER ===
   // wall-clock 기반 (placedAt 시점부터 경과한 실제 시간으로 roast 계산).
@@ -495,8 +476,16 @@ export function BonfireScene() {
         return next;
       });
     };
-    const loop = () => {
-      tick();
+    // 매 RAF 마다 setPile 호출하면 7개 SweetPotato 가 60Hz 로 재렌더 → main thread 부하 ↑.
+    // 같은 thread 의 불꽃 RAF callback 지연됨. 30Hz 로 throttle.
+    let lastTickAt = 0;
+    const loop = (now: number) => {
+      if (now - lastTickAt > 80) {
+        // ~12Hz — roast 진행은 18 초라 step 차이 0.45% / tick, 시각적으로 충분히 부드럽고
+        // 매 RAF 마다 React reconciliation 안 일어나서 불꽃 RAF main-thread 여유 확보.
+        lastTickAt = now;
+        tick();
+      }
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
@@ -658,10 +647,14 @@ export function BonfireScene() {
 
       // ref 로 DOM 직접 갱신 — setState 안 거쳐서 다른 setState(roast pile 등)와의
       // batch/timing 충돌 없이 매끄러움.
-      if (myCharRef.current) {
+      if (myCharRef.current && spot) {
         myCharRef.current.style.transform = `translate(${motion.dx}px, ${
           -(motion.dy + motion.yJump)
         }px)`;
+        // 모닥불 깊이 처리 — 본인 캐릭터 base viewport bottom (silhouettes container 180 + spot.y + dy).
+        // 270 (모닥불 base) 보다 작으면 불 앞(z 25), 크면 불 뒤(z 8).
+        const charBottomY = 180 + spot.y + motion.dy;
+        myCharRef.current.style.zIndex = charBottomY < 270 ? '25' : '8';
       }
       raf = requestAnimationFrame(loop);
     };
@@ -675,11 +668,17 @@ export function BonfireScene() {
     };
   }, []);
 
-  // === poke fire (easter egg: tap the campfire to roast faster) ===
-  const pokeFire = useCallback(() => {
+  // === poke fire (easter egg: tap the campfire to roast faster + 불멍가루 splash) ===
+  const pokeFire = useCallback((e?: React.MouseEvent<HTMLDivElement>) => {
     AudioEngine.ensure();
     setShake(true);
     setTimeout(() => setShake(false), 220);
+    // 불꽃에 무지개 splash — 모닥불 zone 클릭에서만 발동
+    if (e) {
+      campfireFlamesRef.current?.splash(e.clientX, e.clientY);
+    } else {
+      campfireFlamesRef.current?.splash(window.innerWidth / 2, window.innerHeight * 0.6);
+    }
     // roast가 placedAt 기반이라 직접 못 더함 — placedAt을 앞당겨서 시뮬레이션.
     setPile((prev) =>
       prev.map((p) => {
@@ -694,21 +693,7 @@ export function BonfireScene() {
         return { ...p, placedAt: newPlacedAt, roast: newRoast };
       }),
     );
-    for (let k = 0; k < 8; k++) {
-      const eid = emberIdRef.current++;
-      const newEmber: EmberParticle = {
-        id: eid,
-        startX: (Math.random() - 0.5) * 30,
-        endX: (Math.random() - 0.5) * 140,
-        endY: -120 - Math.random() * 200,
-        duration: 1500 + Math.random() * 1200,
-      };
-      setEmbers((prev) => [...prev, newEmber]);
-      setTimeout(
-        () => setEmbers((prev) => prev.filter((e) => e.id !== eid)),
-        newEmber.duration + 100,
-      );
-    }
+    // pokeFire 시 부가 ember burst 는 CampfireFlames 의 splash 효과로 대체.
   }, []);
 
   const submit = useCallback(
@@ -836,6 +821,14 @@ export function BonfireScene() {
           const isMine = i === mySilhouetteIdx;
           // 본인은 flip 무시 (정면 유지) — translate 와 scaleX 합성 시 좌우 부호 헷갈림 제거.
           const otherTransform = s.flip ? 'scaleX(-1)' : 'none';
+          // === 모닥불 깊이 처리 ===
+          // silhouettes container bottom 180 + spot.y = silhouette base viewport bottom.
+          // 모닥불 통나무 base viewport bottom ~ 270 (bonfireZone bottom 270).
+          // silhouette base < 270 → 모닥불 앞 (z 25, CampfireFlames 14~16 위)
+          // silhouette base >= 270 → 모닥불 뒤 (z 8, CampfireFlames 아래, bonfireZone 5 위)
+          // (본인 캐릭터는 motion.dy 로 변화 → RAF 안에서 ref.style.zIndex 동적 갱신)
+          const charBottomY = 180 + s.y;
+          const staticDepthZ = charBottomY < 270 ? 25 : 8;
           return (
             <div
               key={s.id}
@@ -847,8 +840,8 @@ export function BonfireScene() {
                 // 본인은 transform key 자체를 안 줌 — ref 가 매 프레임 직접 갱신.
                 // 다른 사람은 React 가 flip 만 set.
                 ...(isMine
-                  ? { zIndex: 20, transition: 'none' }
-                  : { transform: otherTransform }),
+                  ? { zIndex: staticDepthZ, transition: 'none' }
+                  : { transform: otherTransform, zIndex: staticDepthZ }),
               }}
             >
               <div
@@ -888,7 +881,25 @@ export function BonfireScene() {
       </div>
 
       {/* Fire glow */}
-      <div className={styles.fireGlow} style={{ opacity: fireIntensity * 0.7 }} />
+      {/* fireGlow / 모닥불 주변 밝아지는 효과 제거 — CampfireFlames 캔버스 자체 글로우로 충분 */}
+
+      {/* 열기구 — 인내의 숲(점프맵) 진입 트리거. 좌측 상단(별똥별 달의 좌우 대칭) 떠 있음. */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '12%',
+          left: '12%',
+          zIndex: 12,
+        }}
+      >
+        <HotAirBalloon
+          onClick={() => {
+            // TODO(jumpgame): useJumpGame().start 와 연결
+            console.log('[hotAirBalloon] click — 점프맵 진입 (다음 작업에서 연결)');
+          }}
+          ariaLabel="인내의 숲 시작"
+        />
+      </div>
 
       {/* Bonfire zone — clicking it boosts roasting (easter egg) */}
       <div
@@ -898,63 +909,37 @@ export function BonfireScene() {
       >
         <Campfire width={280} fireIntensity={fireIntensity} />
 
-        {/* Roasting potatoes */}
-        <div className={styles.potatoRow}>
-          {pile.map((p) => {
-            const slot = POTATO_SLOTS[p.slotIdx % POTATO_SLOTS.length];
-            return (
-              <div
-                key={p.id}
-                className={`${styles.potatoItem} ${p.cracked ? styles.cracked : ''}`}
-                style={{
-                  left: `calc(50% + ${slot.x}px)`,
-                  bottom: `${slot.y}px`,
-                  zIndex: 16 + slot.z,
-                  transform: `translateX(-50%) rotate(${slot.r}deg) scale(${slot.s})`,
-                }}
-                title={p.text}
-              >
-                <SweetPotato size={36} seed={p.seed} roastLevel={p.roast} cracked={p.cracked} />
-              </div>
-            );
-          })}
-        </div>
+        {/* embers 는 CampfireFlames 캔버스에서 처리 — 기존 div 시스템 제거됨.
+            potatoRow 는 stage 자식으로 빼서 z 50 (CampfireFlames z 14~16 위)에 둠. */}
 
-        {/* Embers */}
-        <div className={styles.emberLayer}>
-          {embers.map((e) => (
+      </div>
+
+      {/* 모닥불 불꽃 — Claude Design 핸드오프(메탈볼 캔버스 파티클).
+          bonfireZone 의 transform 이 fixed containing block 을 가둬서
+          좌표가 어긋남. stage 직접 자식으로 두어 viewport 기준 fixed 가 작동하게. */}
+      <CampfireFlames ref={campfireFlamesRef} />
+
+      {/* 굽고 있는 고구마 — bonfireZone 에서 빼서 stage 자식으로. z 50 으로 불꽃 위에 보임.
+          bonfireZone bottom 220 기준으로 좌표 offset. */}
+      <div className={styles.potatoRowFloating}>
+        {pile.map((p) => {
+          const slot = POTATO_SLOTS[p.slotIdx % POTATO_SLOTS.length];
+          return (
             <div
-              key={e.id}
-              className={styles.emberParticle}
-              style={
-                {
-                  left: `calc(50% + ${e.startX}px)`,
-                  bottom: '120px',
-                  animation: `emberRise ${e.duration}ms ease-out forwards`,
-                  ['--end-x' as string]: e.endX + 'px',
-                  ['--end-y' as string]: e.endY + 'px',
-                } as React.CSSProperties
-              }
-            />
-          ))}
-        </div>
-
-        {/* Animated flames — radial-gradient teardrops, tall and narrow,
-            multiple layers + aggressive leap = 활활 타오르는 캠프파이어 */}
-        <div
-          className={styles.campfireFlames}
-          style={{ ['--intensity' as string]: fireIntensity } as React.CSSProperties}
-        >
-          <div className={`${styles.flame} ${styles.fHaze}`} />
-          <div className={`${styles.flame} ${styles.fBackL}`} />
-          <div className={`${styles.flame} ${styles.fBackR}`} />
-          <div className={`${styles.flame} ${styles.fBack}`} />
-          <div className={`${styles.flame} ${styles.fMid}`} />
-          <div className={`${styles.flame} ${styles.fFront}`} />
-          <div className={`${styles.flame} ${styles.fCore}`} />
-          <div className={`${styles.flame} ${styles.fInner}`} />
-        </div>
-
+              key={p.id}
+              className={`${styles.potatoItem} ${p.cracked ? styles.cracked : ''}`}
+              style={{
+                left: `calc(50% + ${slot.x}px)`,
+                bottom: `${270 + slot.y}px`,
+                zIndex: 50 + slot.z,
+                transform: `translateX(-50%) rotate(${slot.r}deg) scale(${slot.s})`,
+              }}
+              title={p.text}
+            >
+              <SweetPotato size={36} seed={p.seed} roastLevel={p.roast} cracked={p.cracked} />
+            </div>
+          );
+        })}
       </div>
 
       {/* Input */}

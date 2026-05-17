@@ -121,12 +121,13 @@
 /* === Campfire zone === */
 .bonfireZone {
   position: absolute;
-  bottom: 220px;
+  bottom: 270px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 12;
+  /* z-index 5 — NightField(1) 위, CampfireFlames 캔버스(12~16) 아래.
+     즉 SVG 통나무는 NightField 그라데이션 위로 보이지만 불꽃 아래. */
+  z-index: 5;
   cursor: pointer;
-  filter: drop-shadow(0 10px 40px rgba(255, 140, 58, 0.45));
   width: 280px;
 }
 .bonfireZone:active { transform: translateX(-50%) scale(0.99); }
@@ -142,122 +143,7 @@
    처음 디자인의 radial-gradient + border-radius 방식으로 복귀.
    대신 height >> width 비율로 잡고 leap을 더 격렬하게 + 좌우 외곽 추가.
    mix-blend-mode: screen + 여러 레이어 = 뾰족하게 솟구치는 캠프파이어 느낌. */
-.campfireFlames {
-  position: absolute;
-  top: 8px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 180px;
-  height: 180px;
-  pointer-events: none;
-  z-index: 13;
-  --intensity: 1;
-}
-.campfireFlames .flame {
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  background: radial-gradient(ellipse at 50% 100%,
-    #fff7d6 0%,
-    var(--ember-pale) 22%,
-    var(--ember-hot) 45%,
-    var(--ember) 70%,
-    var(--rust-deep) 90%,
-    transparent 100%);
-  border-radius: 50% 50% 30% 30% / 90% 90% 15% 15%;
-  filter: blur(1px);
-  mix-blend-mode: screen;
-  transform-origin: 50% 100%;
-  opacity: calc(0.9 * var(--intensity));
-  will-change: transform;
-}
-
-/* 가장 외곽 — 따뜻한 글로우 */
-.campfireFlames .fHaze {
-  width: 110px; height: 150px;
-  margin-left: -55px;
-  filter: blur(10px);
-  opacity: calc(0.4 * var(--intensity));
-  animation: campLeap 1.4s ease-in-out infinite alternate;
-  background: radial-gradient(ellipse at 50% 100%,
-    var(--ember-hot) 0%,
-    var(--ember) 35%,
-    var(--rust-deep) 70%,
-    transparent 100%);
-}
-
-/* 좌측 외곽 작은 혀 */
-.campfireFlames .fBackL {
-  width: 32px; height: 130px;
-  margin-left: -46px;
-  filter: blur(1.8px);
-  opacity: calc(0.65 * var(--intensity));
-  animation: campLeapLean 0.7s ease-in-out infinite alternate;
-  animation-delay: 0.05s;
-}
-
-/* 우측 외곽 작은 혀 */
-.campfireFlames .fBackR {
-  width: 32px; height: 130px;
-  margin-left: 14px;
-  filter: blur(1.8px);
-  opacity: calc(0.65 * var(--intensity));
-  animation: campLeapLeanR 0.62s ease-in-out infinite alternate;
-  animation-delay: 0.1s;
-}
-
-/* 메인 뒤쪽 혀 */
-.campfireFlames .fBack {
-  width: 56px; height: 165px;
-  margin-left: -28px;
-  filter: blur(1.2px);
-  animation: campLeap 0.55s ease-in-out infinite alternate;
-}
-
-/* 가운데 본체 */
-.campfireFlames .fMid {
-  width: 44px; height: 150px;
-  margin-left: -22px;
-  filter: blur(0.9px);
-  animation: campLeap2 0.42s ease-in-out infinite alternate;
-  animation-delay: 0.08s;
-}
-
-/* 앞쪽 좁은 혀 */
-.campfireFlames .fFront {
-  width: 32px; height: 130px;
-  margin-left: -16px;
-  filter: blur(0.7px);
-  animation: campLeap3 0.36s ease-in-out infinite alternate;
-  animation-delay: 0.15s;
-}
-
-/* 흰 코어 */
-.campfireFlames .fCore {
-  width: 24px; height: 110px;
-  margin-left: -12px;
-  background: radial-gradient(ellipse at 50% 100%,
-    #fff 0%,
-    #ffefa0 25%,
-    var(--ember-hot) 60%,
-    transparent 100%);
-  filter: blur(0.6px);
-  animation: campLeap2 0.28s ease-in-out infinite alternate;
-}
-
-/* 가장 안쪽 흰빛 끝 */
-.campfireFlames .fInner {
-  width: 14px; height: 80px;
-  margin-left: -7px;
-  background: radial-gradient(ellipse at 50% 100%,
-    #fff 0%,
-    #fff 30%,
-    rgba(255, 239, 160, 0.6) 70%,
-    transparent 100%);
-  filter: blur(0.4px);
-  animation: campLeap3 0.22s ease-in-out infinite alternate;
-  opacity: calc(0.95 * var(--intensity));
-}
+/* 옛 CSS gradient 불꽃 8 layer 는 CampfireFlames 캔버스 컴포넌트로 대체됨. */
 
 /* === Potatoes nestled on the campfire logs === */
 .potatoRow {
@@ -267,6 +153,14 @@
   right: 0;
   height: 80px;
   pointer-events: none;
+}
+/* stage 직접 자식 버전 — CampfireFlames(z 12~16) 위에 떠 있도록 z 50.
+   bonfireZone 의 transform stacking 영향 없이 stage 레벨에서 평가. */
+.potatoRowFloating {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
 }
 .potatoItem {
   position: absolute;
@@ -302,13 +196,13 @@
 .silhouettes {
   position: absolute;
   bottom: 180px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 1100px;
-  max-width: 100%;
+  /* transform 제거 — stacking context 가둠을 풀어서 각 silhouette 의 inline z-index 가
+     stage 레벨에서 직접 평가되게 (불 앞/뒤 동적 z 결정). */
+  left: max(0px, calc(50vw - 550px));
+  width: min(1100px, 100vw);
   height: 200px;
   pointer-events: none;
-  z-index: 10;
+  /* z-index 명시 안 함 — 자식이 직접 z-index 가짐 */
 }
 .silhouette {
   position: absolute;
