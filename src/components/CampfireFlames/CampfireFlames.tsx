@@ -14,7 +14,7 @@ import styles from './CampfireFlames.module.css';
 const TWEAKS = {
   intensity: 0.85,
   wind: -0.05,
-  emberCount: 10,
+  emberCount: 24,
   smokeAmount: 0.45,
   flameWidth: 0.8,
   flameHeight: 1.6,
