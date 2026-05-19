@@ -60,6 +60,10 @@ export function useMeteorGame(opts: Options): MeteorGameApi {
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const meteorIdRef = useRef(1);
 
+  // === pause 보정 — 탭 hidden 시 시간/시뮬 정지, visible 복귀 시 hidden 동안 흐른 시간을 차감 ===
+  const pausedAtRef = useRef<number | null>(null);
+  const pauseAccumRef = useRef(0);
+
   // === 게임 시작 ===
   const start = useCallback(() => {
     if (gameState !== 'idle') return;
@@ -67,6 +71,8 @@ export function useMeteorGame(opts: Options): MeteorGameApi {
     setMeteors([]);
     setSurvivedMs(0);
     setCountdownNum(3);
+    pausedAtRef.current = null;
+    pauseAccumRef.current = 0;
     setGameState('countdown');
   }, [gameState]);
 
@@ -134,6 +140,11 @@ export function useMeteorGame(opts: Options): MeteorGameApi {
     const startAt = performance.now();
     let last = startAt;
     let lastSpawn = startAt;
+    // playing 진입 시점이 hidden 이면 그 시점부터 pause 시작 — visible 복귀 시 pauseAccum 으로
+    // 그 사이 wall-clock 흐름이 elapsed 에서 빠짐.
+    pauseAccumRef.current = 0;
+    pausedAtRef.current =
+      document.visibilityState === 'hidden' ? startAt : null;
     let burst50 = false;
     let burst100 = false;
     const shuffled = [...skyStars].sort(() => Math.random() - 0.5);
@@ -145,7 +156,7 @@ export function useMeteorGame(opts: Options): MeteorGameApi {
     const loop = (now: number) => {
       const dt = Math.min(50, now - last);
       last = now;
-      const elapsed = now - startAt;
+      const elapsed = now - startAt - pauseAccumRef.current;
       setSurvivedMs(elapsed);
 
       // burst 헬퍼 — 특정 별 그룹을 그 자리에서 별똥별로 변환
@@ -236,6 +247,25 @@ export function useMeteorGame(opts: Options): MeteorGameApi {
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState]);
+
+  // === 탭 visibility — countdown/playing 동안 hidden 으로 흐른 시간을 elapsed 에서 차감 ===
+  // RAF 가 백그라운드에서 거의 멈춰 시뮬은 정지되는데 wall-clock(now-startAt) 만 흘러 점수만
+  // 부풀던 어뷰징 방지. visible 복귀 시 hidden 동안 흐른 시간을 pauseAccum 에 누적해서 빼줌.
+  useEffect(() => {
+    if (gameState !== 'playing' && gameState !== 'countdown') return;
+    const onVis = () => {
+      if (document.visibilityState === 'hidden') {
+        if (pausedAtRef.current === null) pausedAtRef.current = performance.now();
+      } else {
+        if (pausedAtRef.current !== null) {
+          pauseAccumRef.current += performance.now() - pausedAtRef.current;
+          pausedAtRef.current = null;
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
   }, [gameState]);
 
   // === gameover 처리: RPC submit + TOP10 fetch ===
