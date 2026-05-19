@@ -159,20 +159,21 @@ export function useMeteorGame(opts: Options): MeteorGameApi {
       const elapsed = now - startAt - pauseAccumRef.current;
       setSurvivedMs(elapsed);
 
-      // burst 헬퍼 — 특정 별 그룹을 그 자리에서 별똥별로 변환
+      // burst 헬퍼 — 특정 별 그룹을 그 자리에서 별똥별로 변환.
+      // 한 번에 많이 떨어지는 만큼 vy 는 천천히 — 일반 spawn 의 절반 정도.
       const dropStars = (starsToDrop: Star[], timeAtMs: number) => {
         const sw = window.innerWidth;
         const sh = window.innerHeight;
         const skyH = sh * 0.6;
-        const speedBoost = timeAtMs / 70000;
+        const speedBoost = (timeAtMs / 70000) * 0.25;
         const droppedIds: number[] = [];
         for (const s of starsToDrop) {
           list.push({
             id: meteorIdRef.current++,
             x: (s.x / 100) * sw,
             y: (s.y / 100) * skyH,
-            vx: (Math.random() - 0.5) * 0.25,
-            vy: 0.45 + Math.random() * 0.4 + speedBoost,
+            vx: (Math.random() - 0.5) * 0.2,
+            vy: 0.22 + Math.random() * 0.18 + speedBoost,
           });
           droppedIds.push(s.id);
         }

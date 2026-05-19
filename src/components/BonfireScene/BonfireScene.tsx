@@ -649,7 +649,7 @@ export function BonfireScene() {
         // 좌우 — base 가 어디든 브라우저 창의 좌·우 끝까지 도달 가능.
         const dxMin = MARGIN_X - charCenterX;
         const dxMax = sw - MARGIN_X - charCenterX;
-        const dyMin = -spot.y;                                  // 컨테이너 바닥 이하 못 내려감
+        const dyMin = -spot.y - 80;                             // 컨테이너 바닥보다 80px 아래까지
         const dyMax = skyBottomPx - containerBottom - spot.y;   // 발이 땅 선 못 넘게
         motion.dx = Math.max(dxMin, Math.min(dxMax, motion.dx));
         motion.dy = Math.max(dyMin, Math.min(dyMax, motion.dy));
