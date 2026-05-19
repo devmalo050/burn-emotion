@@ -281,6 +281,14 @@ export function BonfireScene() {
     silhouettesRef.current = silhouettes;
   }, [silhouettes]);
 
+  useEffect(() => {
+    if (typeof document === 'undefined' || !document.fonts?.load) return;
+    document.fonts.load('800 200px Pretendard').catch(() => {});
+    document.fonts.load('700 42px Pretendard').catch(() => {});
+    document.fonts.load('600 18px Pretendard').catch(() => {});
+    document.fonts.load('400 14px Pretendard').catch(() => {});
+  }, []);
+
   // === Supabase Realtime: broadcast (메시지) + presence (접속자/실루엣) ===
   // 실제 멀티유저 모드일 때만. presence가 silhouettes 의 source of truth.
   useEffect(() => {
@@ -817,7 +825,11 @@ export function BonfireScene() {
       <StarrySky
         stars={skyStars}
         hiddenStarIds={hiddenStarIds}
-        onMoonClick={meteor.start}
+        onMoonClick={() => {
+          if (jump.gameState !== 'idle') return;
+          if (meteor.gameState !== 'idle') return;
+          meteor.start();
+        }}
         onLeaderboardClick={meteor.openLeaderboard}
       />
       <NightField />
@@ -942,6 +954,8 @@ export function BonfireScene() {
       >
         <HotAirBalloon
           onClick={() => {
+            if (meteor.gameState !== 'idle') return;
+            if (jump.gameState !== 'idle') return;
             const spot = mySpotRef.current;
             jump.start(spot ? { x: spot.x, y: spot.y } : undefined);
           }}
