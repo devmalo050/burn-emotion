@@ -820,8 +820,31 @@ export function BonfireScene() {
 
   const fireIntensity = Math.min(1.5, 0.85 + pile.length * 0.04);
 
+  // 점프맵 진행 중 카메라 따라 메인 씬(stage 안 sceneShift wrapper) 만 아래로 밀려
+  // 위로 올라가는 효과. JumpGameOverlay/MeteorOverlay 는 wrapper 밖이라 영향 없음.
+  const sceneShiftRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (jump.gameState !== 'playing' && jump.gameState !== 'gameover') {
+      if (sceneShiftRef.current) sceneShiftRef.current.style.transform = '';
+      return;
+    }
+    return jump.registerFrameListener(() => {
+      if (sceneShiftRef.current) {
+        sceneShiftRef.current.style.transform = `translate3d(0, ${jump.cameraYRef.current}px, 0)`;
+      }
+    });
+  }, [jump.gameState, jump.registerFrameListener, jump.cameraYRef]);
+
   return (
     <div className="stage">
+      <div
+        ref={sceneShiftRef}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          willChange: 'transform',
+        }}
+      >
       <StarrySky
         stars={skyStars}
         hiddenStarIds={hiddenStarIds}
@@ -981,9 +1004,6 @@ export function BonfireScene() {
           좌표가 어긋남. stage 직접 자식으로 두어 viewport 기준 fixed 가 작동하게. */}
       <CampfireFlames ref={campfireFlamesRef} />
 
-      {/* 인내의 숲 게임 오버레이 — 게임 active 시 fullscreen */}
-      <JumpGameOverlay api={jump} myNick={myNick} />
-
       {/* 굽고 있는 고구마 — bonfireZone 에서 빼서 stage 자식으로. z 50 으로 불꽃 위에 보임.
           bonfireZone bottom 220 기준으로 좌표 offset. */}
       <div className={styles.potatoRowFloating}>
@@ -1081,7 +1101,11 @@ export function BonfireScene() {
       </div>
 
       <div className={styles.grain} />
+      </div>{/* /sceneShift */}
 
+      {/* 게임 오버레이는 sceneShift wrapper 밖 — stage transform 영향 안 받게.
+          캐릭터/발판은 viewport 기준 그 자리에 유지되고 메인 씬만 아래로 밀려야 함. */}
+      <JumpGameOverlay api={jump} myNick={myNick} />
       <MeteorOverlay api={meteor} myNick={myNick} />
     </div>
   );
