@@ -19,6 +19,10 @@ const TWEAKS = {
   flameWidth: 0.8,
   flameHeight: 1.6,
   splashDurationSec: 5,
+  // 불꽃 시뮬 시간 척도 — 0.2~2.0, 기본 1.0.
+  // 1.0 일 때 디자인 원본 그대로. <1 이면 천천히 일렁임 (도달 높이/모양 동일).
+  // 적용: life += SPEED, 위치 += v*SPEED, 매 프레임 곱은 Math.pow(원래값, SPEED), spawn 도 SPEED 비례 accumulator.
+  speed: 0.3,
 } as const;
 
 const PALETTE = ['#ff9a2a', '#ff6a14', '#e8420c', '#a52409', '#3a0d04'];
@@ -156,48 +160,59 @@ export const CampfireFlames = forwardRef<CampfireFlamesHandle>(function Campfire
     const H = c.height;
     const parts: FlameParticle[] = [];
     let raf = 0;
+    let spawnAcc = 0; // SPEED < 1 일 때 분수 spawn 누적
 
-    const spawn = () => {
-      const rate = Math.max(1, Math.round(3 * TWEAKS.intensity + 1));
+    const pushOne = () => {
+      const stream = Math.floor(Math.random() * 5) - 2;
+      const baseX = W / 2 + stream * 28 * TWEAKS.flameWidth + (Math.random() - 0.5) * 16;
       const now = performance.now();
       const splash = splashActiveAt(now);
       const sAlpha = splashAlphaAt(now);
-      for (let i = 0; i < rate; i++) {
-        const stream = Math.floor(Math.random() * 5) - 2;
-        const baseX = W / 2 + stream * 28 * TWEAKS.flameWidth + (Math.random() - 0.5) * 16;
-        const useSplash = splash && Math.random() < 0.7 * sAlpha;
-        parts.push({
-          x: baseX,
-          y: H - 20 + Math.random() * 8,
-          baseX,
-          flick: Math.random() * Math.PI * 2,
-          flickSpeed: 0.06 + Math.random() * 0.04,
-          vx: (Math.random() - 0.5) * 0.25 + TWEAKS.wind * 1.2,
-          vy: -(2.2 + Math.random() * 1.6) * (0.7 + 0.6 * TWEAKS.intensity) * TWEAKS.flameHeight,
-          r: 16 + Math.random() * 14,
-          life: 0,
-          maxLife: 55 + Math.random() * 30,
-          hue: useSplash ? randomSplashHue() : null,
-        });
+      const useSplash = splash && Math.random() < 0.7 * sAlpha;
+      parts.push({
+        x: baseX,
+        y: H - 20 + Math.random() * 8,
+        baseX,
+        flick: Math.random() * Math.PI * 2,
+        flickSpeed: 0.06 + Math.random() * 0.04,
+        vx: (Math.random() - 0.5) * 0.25 + TWEAKS.wind * 1.2,
+        vy: -(2.2 + Math.random() * 1.6) * (0.7 + 0.6 * TWEAKS.intensity) * TWEAKS.flameHeight,
+        r: 16 + Math.random() * 14,
+        life: 0,
+        maxLife: 55 + Math.random() * 30,
+        hue: useSplash ? randomSplashHue() : null,
+      });
+    };
+
+    const spawn = () => {
+      const baseRate = Math.max(1, Math.round(3 * TWEAKS.intensity + 1));
+      spawnAcc += baseRate * TWEAKS.speed;
+      while (spawnAcc >= 1) {
+        spawnAcc -= 1;
+        pushOne();
       }
       if (parts.length > 180) parts.splice(0, parts.length - 180);
     };
 
     const step = () => {
+      const S = TWEAKS.speed;
+      const dragVy = Math.pow(0.992, S);
+      const shrinkEarly = Math.pow(0.997, S);
+      const shrinkLate = Math.pow(0.965, S);
       ctx.clearRect(0, 0, W, H);
       ctx.globalCompositeOperation = 'lighter';
       spawn();
 
       for (let i = parts.length - 1; i >= 0; i--) {
         const p = parts[i];
-        p.life++;
-        p.flick += p.flickSpeed;
+        p.life += S;
+        p.flick += p.flickSpeed * S;
         const k = p.life / p.maxLife;
         const taperPull = (p.baseX - W / 2) * 0.012 * k;
-        p.x += p.vx + Math.sin(p.flick) * 0.6 - taperPull;
-        p.y += p.vy;
-        p.vy *= 0.992;
-        p.r *= k < 0.4 ? 0.997 : 0.965;
+        p.x += (p.vx + Math.sin(p.flick) * 0.6 - taperPull) * S;
+        p.y += p.vy * S;
+        p.vy *= dragVy;
+        p.r *= k < 0.4 ? shrinkEarly : shrinkLate;
         if (k >= 1 || p.r < 1.5) {
           parts.splice(i, 1);
           continue;
@@ -217,9 +232,10 @@ export const CampfireFlames = forwardRef<CampfireFlamesHandle>(function Campfire
 
         const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
         if (p.hue != null) {
-          g.addColorStop(0, `hsla(${p.hue},92%,65%,0.7)`);
-          g.addColorStop(0.6, `hsla(${p.hue},92%,55%,0.25)`);
-          g.addColorStop(1, `hsla(${p.hue},92%,50%,0)`);
+          // splash — additive 합성 흰색 방지 + 일렁임 안 도드라지게 alpha 적당히.
+          g.addColorStop(0, `hsla(${p.hue},92%,50%,0.55)`);
+          g.addColorStop(0.6, `hsla(${p.hue},92%,42%,0.22)`);
+          g.addColorStop(1, `hsla(${p.hue},92%,38%,0)`);
         } else {
           g.addColorStop(0, col + 'b0');
           g.addColorStop(0.6, col + '40');
@@ -248,55 +264,66 @@ export const CampfireFlames = forwardRef<CampfireFlamesHandle>(function Campfire
     const H = c.height;
     const parts: FlameParticle[] = [];
     let raf = 0;
+    let spawnAcc = 0;
 
-    const spawn = () => {
-      const rate = Math.max(1, Math.round(2 * TWEAKS.intensity + 1));
+    const pushOne = () => {
+      const baseX = W / 2 + (Math.random() - 0.5) * 48 * TWEAKS.flameWidth;
       const now = performance.now();
       const splash = splashActiveAt(now);
       const sAlpha = splashAlphaAt(now);
-      for (let i = 0; i < rate; i++) {
-        const baseX = W / 2 + (Math.random() - 0.5) * 48 * TWEAKS.flameWidth;
-        const useSplash = splash && Math.random() < 0.7 * sAlpha;
-        parts.push({
-          x: baseX,
-          baseX,
-          y: H - 10 + Math.random() * 6,
-          flick: Math.random() * Math.PI * 2,
-          flickSpeed: 0.08 + Math.random() * 0.04,
-          vx: (Math.random() - 0.5) * 0.15 + TWEAKS.wind * 0.8,
-          vy: -(1.8 + Math.random() * 1.2) * TWEAKS.flameHeight,
-          r: 9 + Math.random() * 8,
-          life: 0,
-          maxLife: 30 + Math.random() * 18,
-          hue: useSplash ? randomSplashHue() : null,
-        });
+      const useSplash = splash && Math.random() < 0.7 * sAlpha;
+      parts.push({
+        x: baseX,
+        baseX,
+        y: H - 10 + Math.random() * 6,
+        flick: Math.random() * Math.PI * 2,
+        flickSpeed: 0.08 + Math.random() * 0.04,
+        vx: (Math.random() - 0.5) * 0.15 + TWEAKS.wind * 0.8,
+        vy: -(1.8 + Math.random() * 1.2) * TWEAKS.flameHeight,
+        r: 9 + Math.random() * 8,
+        life: 0,
+        maxLife: 30 + Math.random() * 18,
+        hue: useSplash ? randomSplashHue() : null,
+      });
+    };
+
+    const spawn = () => {
+      const baseRate = Math.max(1, Math.round(2 * TWEAKS.intensity + 1));
+      spawnAcc += baseRate * TWEAKS.speed;
+      while (spawnAcc >= 1) {
+        spawnAcc -= 1;
+        pushOne();
       }
       if (parts.length > 70) parts.splice(0, parts.length - 70);
     };
 
     const step = () => {
+      const S = TWEAKS.speed;
+      const dragVy = Math.pow(0.99, S);
+      const shrinkEarly = Math.pow(0.995, S);
+      const shrinkLate = Math.pow(0.94, S);
       ctx.clearRect(0, 0, W, H);
       ctx.globalCompositeOperation = 'lighter';
       spawn();
       for (let i = parts.length - 1; i >= 0; i--) {
         const p = parts[i];
-        p.life++;
-        p.flick += p.flickSpeed;
+        p.life += S;
+        p.flick += p.flickSpeed * S;
         const k = p.life / p.maxLife;
         const taperPull = (p.baseX - W / 2) * 0.02 * k;
-        p.x += p.vx + Math.sin(p.flick) * 0.4 - taperPull;
-        p.y += p.vy;
-        p.vy *= 0.99;
-        p.r *= k < 0.5 ? 0.995 : 0.94;
+        p.x += (p.vx + Math.sin(p.flick) * 0.4 - taperPull) * S;
+        p.y += p.vy * S;
+        p.vy *= dragVy;
+        p.r *= k < 0.5 ? shrinkEarly : shrinkLate;
         if (k >= 1 || p.r < 1) {
           parts.splice(i, 1);
           continue;
         }
         const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
         if (p.hue != null) {
-          g.addColorStop(0, `hsla(${p.hue},90%,82%,0.85)`);
-          g.addColorStop(0.6, `hsla(${p.hue},90%,65%,0.3)`);
-          g.addColorStop(1, `hsla(${p.hue},90%,55%,0)`);
+          g.addColorStop(0, `hsla(${p.hue},90%,60%,0.6)`);
+          g.addColorStop(0.6, `hsla(${p.hue},90%,48%,0.24)`);
+          g.addColorStop(1, `hsla(${p.hue},90%,42%,0)`);
         } else {
           let col: string;
           if (k < 0.4) col = CORE_PALETTE[0];
@@ -336,10 +363,11 @@ export const CampfireFlames = forwardRef<CampfireFlamesHandle>(function Campfire
     window.addEventListener('resize', resize);
 
     const spawnEmbers = () => {
+      // 모닥불 base 가 viewport bottom 290px 이라 그 근처에서 ember spawn.
       while (embers.length < TWEAKS.emberCount) {
         embers.push({
-          x: window.innerWidth / 2 + (Math.random() - 0.5) * 140,
-          y: window.innerHeight * 0.78 + Math.random() * 16,
+          x: window.innerWidth / 2 + (Math.random() - 0.5) * 80,
+          y: window.innerHeight - 300 + (Math.random() - 0.5) * 20,
           vx: (Math.random() - 0.5) * 0.4 + TWEAKS.wind * 1.5,
           vy: -(0.8 + Math.random() * 1.6),
           r: 0.6 + Math.random() * 1.6,
@@ -401,16 +429,17 @@ export const CampfireFlames = forwardRef<CampfireFlamesHandle>(function Campfire
         p.vy *= 0.94;
         p.x += p.vx;
         p.y += p.vy;
-        const a = (1 - k) * 0.95;
+        // powder sparks alpha — 흰색 안 되는 선에서 적당히
+        const a = (1 - k) * 0.72;
         const r = p.r;
         const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 8);
-        g.addColorStop(0, `hsla(${p.hue},100%,70%,${a * 0.9})`);
-        g.addColorStop(1, `hsla(${p.hue},100%,55%,0)`);
+        g.addColorStop(0, `hsla(${p.hue},100%,58%,${a * 0.7})`);
+        g.addColorStop(1, `hsla(${p.hue},100%,45%,0)`);
         ctx.fillStyle = g;
         ctx.beginPath();
         ctx.arc(p.x, p.y, r * 8, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = `hsla(${p.hue},100%,90%,${a})`;
+        ctx.fillStyle = `hsla(${p.hue},100%,70%,${a * 0.7})`;
         ctx.beginPath();
         ctx.arc(p.x, p.y, r * 1.4, 0, Math.PI * 2);
         ctx.fill();

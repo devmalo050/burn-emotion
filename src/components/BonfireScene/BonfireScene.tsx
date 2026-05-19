@@ -7,11 +7,14 @@ import { StarrySky, makeStars } from '@/components/StarrySky/StarrySky';
 import { NightField } from '@/components/NightField/NightField';
 import { useMeteorGame } from '@/components/MeteorGame/useMeteorGame';
 import { MeteorOverlay } from '@/components/MeteorGame/MeteorOverlay';
+import { useJumpGame } from '@/components/JumpGame/useJumpGame';
+import { JumpGameOverlay } from '@/components/JumpGame/JumpGameOverlay';
 import { HotAirBalloon } from '@/components/HotAirBalloon/HotAirBalloon';
 import {
   CampfireFlames,
   type CampfireFlamesHandle,
 } from '@/components/CampfireFlames/CampfireFlames';
+import { HeadFire } from '@/components/CampfireFlames/HeadFire';
 import { makeNickname } from '@/lib/nickname';
 import { PLACEHOLDER_LINES } from '@/lib/data/placeholder-lines';
 import { COMFORT_LINES, type ComfortLine } from '@/lib/data/comfort-lines';
@@ -128,6 +131,13 @@ export function BonfireScene() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   // 캠프파이어 불꽃(캔버스) ref — 모닥불 클릭 시 splash 트리거
   const campfireFlamesRef = useRef<CampfireFlamesHandle | null>(null);
+  // 가장 최근 splash 종료 시점 (불멍가루 활성 중인지 알기 위함)
+  const splashUntilRef = useRef(0);
+  // 본인 캐릭터가 모닥불 zone 안에 있는지 (진입 감지용)
+  const inBonfireZoneRef = useRef(false);
+  // 머리 위 불꽃 이스터에그 — 캐릭터가 모닥불 통과 시 5초 지속
+  const [headFire, setHeadFire] = useState<{ rainbow: boolean } | null>(null);
+  const headFireTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 도배 방지용 — 마지막 보낸 메시지 텍스트와 시각, 직전 N초 내 보낸 횟수
   const lastSentRef = useRef<{ text: string; at: number; recent: number[] }>({
     text: '',
@@ -180,6 +190,9 @@ export function BonfireScene() {
     skyStars,
     setHiddenStarIds,
   });
+
+  // === 인내의 숲 점프맵 (이스터에그) ===
+  const jump = useJumpGame({ myNick });
 
   // === spawn potato AT the fire — stable slot so existing potatoes
   // don't reshuffle. At max capacity, only replace an already-cracked
@@ -526,7 +539,7 @@ export function BonfireScene() {
   // 슬래시는 입력값에 그대로 prefix 추가해서 "/별똥별" 같은 슬래시 커맨드 자연스럽게 시작.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (meteor.gameState !== 'idle') return;
+      if (meteor.gameState !== 'idle' || jump.gameState !== 'idle') return;
       if (document.activeElement === inputRef.current) return;
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -542,12 +555,14 @@ export function BonfireScene() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [meteor.gameState]);
+  }, [meteor.gameState, jump.gameState]);
 
   // === EASTER EGG: 방향키 이동 + 스페이스바 점프 ===
   // 본인 화면에서만 (presence 업데이트 안 함). 채팅 입력창 blur 일 때만 키 인식.
   // 대각선은 두 키 동시 입력 시 자동 정규화 (대각선이 더 빠르지 않게).
   useEffect(() => {
+    // 점프 게임 중에는 모닥불 옆 silhouette motion 비활성 (같은 키를 점프 게임이 처리).
+    if (jump.gameState !== 'idle') return;
     const motion = motionRef.current;
     const onKeyDown = (e: KeyboardEvent) => {
       const k = e.key;
@@ -655,6 +670,30 @@ export function BonfireScene() {
         // 270 (모닥불 base) 보다 작으면 불 앞(z 25), 크면 불 뒤(z 8).
         const charBottomY = 180 + spot.y + motion.dy;
         myCharRef.current.style.zIndex = charBottomY < 270 ? '25' : '8';
+
+        // === 머리 위 불 이스터에그 — 캐릭터가 모닥불 zone 안 지나가면 점화 ===
+        // 화면 좌표 계산: silhouettes container (1100 max-width, center) 안 spot.x % + dx.
+        const sw = window.innerWidth;
+        const cw = Math.min(1100, sw);
+        const containerLeft = (sw - cw) / 2;
+        const charScreenX = containerLeft + (spot.x / 100) * cw + motion.dx;
+        // 모닥불 zone: 화면 center ±60 (실제 통나무 폭에 가깝게).
+        const bonfireCenter = sw / 2;
+        const xIn = Math.abs(charScreenX - bonfireCenter) < 60;
+        // 캐릭터 발이 통나무 위 좁은 영역 안.
+        const charBottomWithJump = 180 + spot.y + motion.dy + motion.yJump;
+        const yIn = charBottomWithJump > 255 && charBottomWithJump < 310;
+        const inZone = xIn && yIn;
+        if (inZone && !inBonfireZoneRef.current) {
+          inBonfireZoneRef.current = true;
+          // splash 활성 중이면 무지개. 아니면 일반 주황.
+          const rainbow = splashUntilRef.current > performance.now();
+          setHeadFire({ rainbow });
+          if (headFireTimerRef.current) clearTimeout(headFireTimerRef.current);
+          headFireTimerRef.current = setTimeout(() => setHeadFire(null), 5000);
+        } else if (!inZone) {
+          inBonfireZoneRef.current = false;
+        }
       }
       raf = requestAnimationFrame(loop);
     };
@@ -666,7 +705,7 @@ export function BonfireScene() {
       window.removeEventListener('blur', onBlur);
       cancelAnimationFrame(raf);
     };
-  }, []);
+  }, [jump.gameState]);
 
   // === poke fire (easter egg: tap the campfire to roast faster + 불멍가루 splash) ===
   const pokeFire = useCallback((e?: React.MouseEvent<HTMLDivElement>) => {
@@ -679,6 +718,8 @@ export function BonfireScene() {
     } else {
       campfireFlamesRef.current?.splash(window.innerWidth / 2, window.innerHeight * 0.6);
     }
+    // splash 지속 시간 5초 동안 머리 불 색이 무지개로 붙음.
+    splashUntilRef.current = performance.now() + 5000;
     // roast가 placedAt 기반이라 직접 못 더함 — placedAt을 앞당겨서 시뮬레이션.
     setPile((prev) =>
       prev.map((p) => {
@@ -702,7 +743,11 @@ export function BonfireScene() {
       const text = draftMessage.trim();
       if (!text) return;
       // === /별똥별 — 게임 트리거 (다른 사람한테 broadcast 안 함, 피드에도 안 띄움) ===
-      if (text === '/별똥별' && meteor.gameState === 'idle') {
+      if (
+        text === '/별똥별' &&
+        meteor.gameState === 'idle' &&
+        jump.gameState === 'idle'
+      ) {
         setDraftMessage('');
         meteor.start();
         return;
@@ -762,7 +807,7 @@ export function BonfireScene() {
         );
       }, 6500);
     },
-    [draftMessage, myNick, silhouettes, mySilhouetteIdx, spawnPotatoAtFire, meteor],
+    [draftMessage, myNick, silhouettes, mySilhouetteIdx, spawnPotatoAtFire, meteor, jump],
   );
 
   const fireIntensity = Math.min(1.5, 0.85 + pile.length * 0.04);
@@ -819,6 +864,8 @@ export function BonfireScene() {
       <div className={styles.silhouettes} style={{ opacity: showPeople ? 1 : 0, transition: 'opacity 0.4s ease' }}>
         {silhouettes.map((s, i) => {
           const isMine = i === mySilhouetteIdx;
+          // 점프 게임 active 시 본인 silhouette 은 숨김 — 점프맵 캐릭터가 그 자리에서 시작.
+          if (isMine && jump.gameState !== 'idle') return null;
           // 본인은 flip 무시 (정면 유지) — translate 와 scaleX 합성 시 좌우 부호 헷갈림 제거.
           const otherTransform = s.flip ? 'scaleX(-1)' : 'none';
           // === 모닥불 깊이 처리 ===
@@ -862,6 +909,7 @@ export function BonfireScene() {
                     : undefined
                 }
               >
+                {isMine && headFire && <HeadFire rainbow={headFire.rainbow} />}
                 <PersonSilhouette variant={s.variant} scale={s.scale} />
               </div>
               {activeBubbles[i] && (
@@ -894,8 +942,8 @@ export function BonfireScene() {
       >
         <HotAirBalloon
           onClick={() => {
-            // TODO(jumpgame): useJumpGame().start 와 연결
-            console.log('[hotAirBalloon] click — 점프맵 진입 (다음 작업에서 연결)');
+            const spot = mySpotRef.current;
+            jump.start(spot ? { x: spot.x, y: spot.y } : undefined);
           }}
           ariaLabel="인내의 숲 시작"
         />
@@ -918,6 +966,9 @@ export function BonfireScene() {
           bonfireZone 의 transform 이 fixed containing block 을 가둬서
           좌표가 어긋남. stage 직접 자식으로 두어 viewport 기준 fixed 가 작동하게. */}
       <CampfireFlames ref={campfireFlamesRef} />
+
+      {/* 인내의 숲 게임 오버레이 — 게임 active 시 fullscreen */}
+      <JumpGameOverlay api={jump} myNick={myNick} />
 
       {/* 굽고 있는 고구마 — bonfireZone 에서 빼서 stage 자식으로. z 50 으로 불꽃 위에 보임.
           bonfireZone bottom 220 기준으로 좌표 offset. */}
