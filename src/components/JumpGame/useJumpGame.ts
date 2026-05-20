@@ -1,21 +1,31 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase/client';
+import {
+  type Platform,
+  type PlatformKind,
+  BREAK_DELAY,
+  SPRING_BOOST_MULT,
+  ROLL_PUSH,
+  ROLLING_WIDTH,
+  MAX_X_AMP,
+  pickPlatformKind,
+  initPlatformFields,
+  updatePlatformPosition,
+} from './platforms/platformLogic';
+
+export type { Platform } from './platforms/platformLogic';
 
 // 본인 silhouette 위치 정보 — 점프 시작점.
 export interface JumpStartSpot {
-  x: number;     // silhouettes container 기준 % (0~100)
-  y: number;     // silhouettes container 안 bottom px
+  x: number;        // silhouettes container 기준 % (0~100)
+  y: number;        // silhouettes container 안 bottom px
+  variant?: number; // PersonSilhouette variant — 캐릭터 디자인 일관성
+  scale?: number;   // PersonSilhouette scale — 배정받은 캐릭터 크기 그대로
 }
 
 export type JumpGameState = 'idle' | 'countdown' | 'playing' | 'gameover';
 
-export interface Platform {
-  id: number;
-  x: number;        // world x (viewport 좌측 기준 px)
-  y: number;        // world y (시작점 0, 위로 갈수록 +)
-  width: number;
-}
 export interface LeaderEntry {
   nick: string;
   height: number;
@@ -29,9 +39,7 @@ export interface LeaderEntry {
 const GRAVITY = 0.0028;          // px/ms²
 const JUMP_INITIAL_V = 1.05;     // 초기 점프 속도 (px/ms, 위 양수)
 const MOVE_SPEED = 0.42;         // 좌우 이동 (px/ms)
-const CHAR_W = 32;
-const CHAR_H = 48;
-const PLATFORM_H = 12;
+// 캐릭터 크기는 배정받은 PersonSilhouette scale 기준. 폭 = 80*scale.
 
 interface Options {
   myNick: string;
@@ -53,6 +61,8 @@ export interface JumpGameApi {
   charXRef: React.RefObject<number>;
   charYRef: React.RefObject<number>;
   cameraYRef: React.RefObject<number>;
+  charVariantRef: React.RefObject<number>;
+  charScaleRef: React.RefObject<number>;
   platformsRef: React.RefObject<Platform[]>;
   worldBaseYRef: React.RefObject<number>;
   // overlay 가 자기 transform/위치 갱신 콜백 등록
@@ -80,11 +90,16 @@ export function useJumpGame({ myNick }: Options): JumpGameApi {
   const maxYRef = useRef(0); // 도달한 최고 world.y
   const platformsRef = useRef<Platform[]>([]);
   const platformIdRef = useRef(1);
+  // 현재 캐릭터가 올라서 있는 발판 — rolling 밀기 / 발판 이탈·소멸 감지용.
+  const standingPlatformRef = useRef<Platform | null>(null);
   const keysRef = useRef<Set<string>>(new Set());
   // 점프 시작점의 viewport bottom 좌표 (silhouette 위치). char.y · platform.y 는 이 점 기준 위로.
   const worldBaseYRef = useRef(0);
   // 점프 시작점의 viewport x 좌표 (silhouette 화면 x). char.x 의 시작점.
   const worldBaseXRef = useRef(0);
+  // 캐릭터 PersonSilhouette variant / scale — 배정받은 캐릭터 그대로.
+  const charVariantRef = useRef(0);
+  const charScaleRef = useRef(0.6);
 
   // overlay 에서 매 프레임 callback 받게
   const frameListenersRef = useRef<Set<() => void>>(new Set());
@@ -109,6 +124,8 @@ export function useJumpGame({ myNick }: Options): JumpGameApi {
 
     worldBaseXRef.current = startScreenX;
     worldBaseYRef.current = startBottomY;
+    charVariantRef.current = spot?.variant ?? 0;
+    charScaleRef.current = spot?.scale ?? 0.6;
     setWorldBaseY(startBottomY);
 
     // 초기화 — char.x/y 와 platform.y 는 worldBase 기준 상대 좌표
@@ -116,22 +133,26 @@ export function useJumpGame({ myNick }: Options): JumpGameApi {
     charYRef.current = 0;
     charVyRef.current = 0;
     charOnGroundRef.current = true;
+    standingPlatformRef.current = null;
     cameraYRef.current = 0;
     maxYRef.current = 0;
     platformIdRef.current = 1;
-    // 시작 발판들 — 점프로 닿게 간격 60~100
+    // 시작 발판들은 모두 basic — 안전한 출발. spawn loop 부터 종류 혼합.
     const list: Platform[] = [];
-    // 첫 발판 — 캐릭터 발 바로 아래
-    list.push({
+    // 첫 발판 — 캐릭터 발 바로 아래. 시작 시 이 발판 위에 서 있음.
+    const firstPlat: Platform = {
       id: platformIdRef.current++,
       x: startScreenX - 60,
       y: -8,
       width: 120,
-    });
+      kind: 'basic',
+    };
+    list.push(firstPlat);
+    standingPlatformRef.current = firstPlat;
     let lastY = 0;
     let lastX = startScreenX;
-    for (let i = 0; i < 8; i++) {
-      lastY += 60 + Math.random() * 35; // 60~95 점프로 닿는 수직 거리
+    for (let i = 0; i < 6; i++) {
+      lastY += 90 + Math.random() * 40; // 90~130 점프로 닿는 수직 거리
       // 가로 거리도 점프 동안 좌우 이동 가능 범위(±220)로 제한
       const offset = (Math.random() - 0.5) * 440;
       lastX = Math.max(20, Math.min(sw - 120, lastX + offset));
@@ -140,6 +161,7 @@ export function useJumpGame({ myNick }: Options): JumpGameApi {
         x: lastX,
         y: lastY,
         width: 100,
+        kind: 'basic',
       });
     }
     platformsRef.current = list;
@@ -250,18 +272,51 @@ export function useJumpGame({ myNick }: Options): JumpGameApi {
       if (keys.has('ArrowLeft')) dx -= 1;
       if (keys.has('ArrowRight')) dx += 1;
       charXRef.current += dx * MOVE_SPEED * dt;
-      // 화면 양 끝에서 멈춤
+
+      // 굴러가는 발판 위면 한쪽으로 떠밀림
+      const standing = standingPlatformRef.current;
+      if (charOnGroundRef.current && standing && standing.kind === 'rolling') {
+        charXRef.current += (standing.rollDir ?? 1) * ROLL_PUSH * dt;
+      }
+
+      // 화면 양 끝에서 멈춤 — 캐릭터 폭 = 80 * scale
+      const charHalfW = 40 * charScaleRef.current;
       charXRef.current = Math.max(
-        CHAR_W / 2,
-        Math.min(window.innerWidth - CHAR_W / 2, charXRef.current),
+        charHalfW,
+        Math.min(window.innerWidth - charHalfW, charXRef.current),
       );
+
+      // 움직이는 발판(drift/swing/lift) x·y 위치 갱신.
+      // 캐릭터가 그 발판 위에 서 있으면 발판 이동량만큼 함께 옮겨짐(동승).
+      for (const p of platformsRef.current) {
+        if (p.kind !== 'drift' && p.kind !== 'swing' && p.kind !== 'lift') continue;
+        const prevPX = p.x;
+        const prevPY = p.y;
+        updatePlatformPosition(p, now);
+        if (charOnGroundRef.current && standing === p) {
+          charXRef.current += p.x - prevPX;
+          charYRef.current += p.y - prevPY;
+        }
+      }
+
+      // 서 있던 발판에서 이탈(좌우 키로 발판 밖으로 걸어나감)하면 낙하.
+      // 동승 덕에 움직이는 발판은 가만 있으면 함께 가므로 떨어지지 않음.
+      if (charOnGroundRef.current && standing) {
+        const offX =
+          charXRef.current < standing.x - 4 ||
+          charXRef.current > standing.x + standing.width + 4;
+        if (offX) {
+          charOnGroundRef.current = false;
+          standingPlatformRef.current = null;
+        }
+      }
 
       // 중력 + 수직 이동
       const prevY = charYRef.current;
       charVyRef.current -= GRAVITY * dt;
       charYRef.current += charVyRef.current * dt;
 
-      // 발판 충돌 — 떨어지는 중(vy < 0) 일 때만, 발판 위에서 아래로 통과하는 순간 착지
+      // 발판 충돌 — 떨어지는 중(vy < 0) 일 때만, 발판 위에서 아래로 통과하는 순간
       let landed = false;
       if (charVyRef.current < 0) {
         for (const p of platformsRef.current) {
@@ -270,16 +325,40 @@ export function useJumpGame({ myNick }: Options): JumpGameApi {
           if (charXRef.current > p.x + p.width + 4) continue;
           // 이전 frame 발판 위, 현재 frame 발판 통과
           if (prevY >= p.y && charYRef.current <= p.y) {
+            if (p.kind === 'hot') {
+              // 뜨거운 발판 — 즉사
+              setLastScoreHeight(maxYRef.current / 50);
+              setGameState('gameover');
+              return;
+            }
+            if (p.kind === 'spring') {
+              // 스프링 — 착지 없이 자동 부스트
+              charYRef.current = p.y;
+              charVyRef.current = JUMP_INITIAL_V * SPRING_BOOST_MULT;
+              charOnGroundRef.current = false;
+              standingPlatformRef.current = null;
+              landed = true;
+              break;
+            }
+            // 일반 착지 (basic/breakable/drift/swing/lift/rolling)
             charYRef.current = p.y;
             charVyRef.current = 0;
             charOnGroundRef.current = true;
+            standingPlatformRef.current = p;
             landed = true;
+            // 부서지는 발판 — 처음 밟은 시각 기록 (0.4초 뒤 소멸).
+            // setPlatforms 로 리렌더 → 발판 컴포넌트가 부서짐 이펙트 재생.
+            if (p.kind === 'breakable' && p.breakAt == null) {
+              p.breakAt = now;
+              setPlatforms([...platformsRef.current]);
+            }
             break;
           }
         }
       }
       if (!landed && charVyRef.current !== 0) {
         charOnGroundRef.current = false;
+        standingPlatformRef.current = null;
       }
 
       // 최고 높이 갱신
@@ -317,29 +396,59 @@ export function useJumpGame({ myNick }: Options): JumpGameApi {
         }
       }
       const sw = window.innerWidth;
+      let lastKind: PlatformKind | null =
+        list.length > 0 ? list[list.length - 1].kind : null;
       while (topY < targetSpawnY) {
         const difficulty = Math.min(1, maxYRef.current / 4000);
-        // 수직 간격 — 점프 최대 도달 ~196px. 후반엔 140~175 까지 늘어남.
-        topY += 60 + Math.random() * 35 + difficulty * 80;
-        // 발판 폭 — 후반엔 40~70 까지 좁아짐.
+        const kind = pickPlatformKind(difficulty, lastKind);
+        // 수직 간격 — 점프 최대 도달 ~196px. 초반 90~130, 후반 150~190.
+        // hot 발판은 앞·뒤 간격을 좁혀(≤78), 이전 발판에서 hot 을 건너뛰어
+        // 그 위 발판으로 직접 점프할 수 있게 함 (78+78=156 < 196).
+        let gap = 90 + Math.random() * 40 + difficulty * 60;
+        if (kind === 'hot' || lastKind === 'hot') {
+          gap = Math.min(gap, 78);
+        }
+        topY += gap;
+        lastKind = kind;
+        // 발판 폭 — 후반엔 40~70 까지 좁아짐. 단 rolling 은 고정(밀려도 버틸 공간).
         const minW = 120 - difficulty * 80;
         const maxW = minW + 30;
-        const w = minW + Math.random() * (maxW - minW);
+        const w =
+          kind === 'rolling'
+            ? ROLLING_WIDTH
+            : minW + Math.random() * (maxW - minW);
         const offset = (Math.random() - 0.5) * 440;
-        lastSpawnX = Math.max(20, Math.min(sw - w - 20, lastSpawnX + offset));
-        list.push({
+        // 움직이는 발판은 가로로 흔들리므로 화면 밖 안 나가게 여유를 둠.
+        const margin = kind === 'drift' || kind === 'swing' ? 20 + MAX_X_AMP : 20;
+        lastSpawnX = Math.max(
+          margin,
+          Math.min(sw - w - margin, lastSpawnX + offset),
+        );
+        const p: Platform = {
           id: platformIdRef.current++,
           x: lastSpawnX,
           y: topY,
           width: w,
-        });
+          kind,
+        };
+        initPlatformFields(p);
+        list.push(p);
         dirty = true;
       }
 
-      // 발판 cleanup — 화면 아래로 한참 떨어진 거 제거 (cameraRelY 기준)
+      // 발판 cleanup — 화면 아래로 떨어진 것 + 밟혀서 부서질 시간이 된 것 제거
       const cullBelow = cameraRelY - 100;
       for (let i = list.length - 1; i >= 0; i--) {
-        if (list[i].y < cullBelow) {
+        const p = list[i];
+        const broken =
+          p.kind === 'breakable' &&
+          p.breakAt != null &&
+          now - p.breakAt > BREAK_DELAY;
+        if (p.y < cullBelow || broken) {
+          if (standingPlatformRef.current === p) {
+            standingPlatformRef.current = null;
+            charOnGroundRef.current = false;
+          }
           list.splice(i, 1);
           dirty = true;
         }
@@ -413,6 +522,8 @@ export function useJumpGame({ myNick }: Options): JumpGameApi {
     charXRef,
     charYRef,
     cameraYRef,
+    charVariantRef,
+    charScaleRef,
     platformsRef,
     registerFrameListener,
   };

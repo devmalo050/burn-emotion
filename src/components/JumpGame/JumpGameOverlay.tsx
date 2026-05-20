@@ -1,15 +1,14 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import type { JumpGameApi } from './useJumpGame';
+import { PersonSilhouette } from '@/components/PersonSilhouette/PersonSilhouette';
+import { GamePlatform } from './platforms/GamePlatforms';
 import styles from './JumpGameOverlay.module.css';
 
 interface Props {
   api: JumpGameApi;
   myNick: string;
 }
-
-const CHAR_W = 32;
-const CHAR_H = 48;
 
 export function JumpGameOverlay({ api, myNick }: Props) {
   const {
@@ -25,6 +24,9 @@ export function JumpGameOverlay({ api, myNick }: Props) {
     charXRef,
     charYRef,
     cameraYRef,
+    charVariantRef,
+    charScaleRef,
+    platformsRef,
     worldBaseYRef,
     registerFrameListener,
   } = api;
@@ -32,6 +34,8 @@ export function JumpGameOverlay({ api, myNick }: Props) {
   const charRef = useRef<HTMLDivElement | null>(null);
   const worldRef = useRef<HTMLDivElement | null>(null);
   const bgWorldRef = useRef<HTMLDivElement | null>(null);
+  // 움직이는 발판(drift/swing/lift) DOM — 매 프레임 left/bottom 갱신용.
+  const platformElsRef = useRef<Map<number, HTMLDivElement>>(new Map());
 
   // 매 RAF 마다 캐릭터/world transform 갱신.
   // 좌표계: char.y · platform.y 는 worldBaseY(=silhouette 위치 viewport bottom) 기준 상대 높이.
@@ -49,17 +53,36 @@ export function JumpGameOverlay({ api, myNick }: Props) {
         bgWorldRef.current.style.transform = `translateY(${cameraYRef.current}px)`;
       }
       if (charRef.current) {
-        // 캐릭터 viewport bottom = worldBaseY + char.y - cameraY → top = sh - bottom - CHAR_H
+        // 캐릭터 크기 = PersonSilhouette 80×170 * scale.
+        const charH = 170 * charScaleRef.current;
+        const charW = 80 * charScaleRef.current;
+        // 캐릭터 viewport bottom = worldBaseY + char.y - cameraY → top = sh - bottom - charH
         const charBottom =
           worldBaseYRef.current + charYRef.current - cameraYRef.current;
-        const charScreenTop = sh - charBottom - CHAR_H;
+        const charScreenTop = sh - charBottom - charH;
         charRef.current.style.transform = `translate(${
-          charXRef.current - CHAR_W / 2
+          charXRef.current - charW / 2
         }px, ${charScreenTop}px)`;
+      }
+      // 움직이는 발판 — platformsRef 의 갱신된 x/y 를 DOM 에 반영
+      for (const p of platformsRef.current) {
+        if (p.kind !== 'drift' && p.kind !== 'swing' && p.kind !== 'lift') continue;
+        const el = platformElsRef.current.get(p.id);
+        if (!el) continue;
+        el.style.left = `${p.x}px`;
+        el.style.bottom = `${p.y}px`;
+        // 사슬 그네 — 사슬을 진자 각도만큼 기울임
+        if (p.kind === 'swing' && p.swingAngle != null) {
+          const deg = (-p.swingAngle * 180) / Math.PI;
+          const chains = el.querySelectorAll('[data-swing-chain]');
+          for (const c of chains) {
+            (c as HTMLElement).style.transform = `rotate(${deg}deg)`;
+          }
+        }
       }
     };
     return registerFrameListener(onFrame);
-  }, [gameState, registerFrameListener, charXRef, charYRef, cameraYRef, worldBaseYRef]);
+  }, [gameState, registerFrameListener, charXRef, charYRef, cameraYRef, charScaleRef, platformsRef, worldBaseYRef]);
 
   if (gameState === 'idle' && !leaderboardOpen) return null;
 
@@ -106,27 +129,28 @@ export function JumpGameOverlay({ api, myNick }: Props) {
             {platforms.map((p) => (
               <div
                 key={p.id}
+                ref={(el) => {
+                  if (el) platformElsRef.current.set(p.id, el);
+                  else platformElsRef.current.delete(p.id);
+                }}
                 className={styles.platform}
-                style={{ left: p.x, bottom: p.y, width: p.width }}
-              />
+                style={{ left: p.x, bottom: p.y }}
+              >
+                <GamePlatform
+                  kind={p.kind}
+                  width={p.width}
+                  breaking={p.breakAt != null}
+                />
+              </div>
             ))}
           </div>
 
-          {/* 캐릭터 */}
+          {/* 캐릭터 — 모닥불 옆 사람과 동일한 PersonSilhouette (배정받은 variant·scale) */}
           <div ref={charRef} className={styles.char}>
-            <svg viewBox="0 0 32 48">
-              {/* 머리 */}
-              <circle cx="16" cy="10" r="8" fill="#2a1a14" stroke="#0a0604" strokeWidth="0.5" />
-              {/* 몸통 */}
-              <path
-                d="M10 18 L22 18 L24 38 L20 46 L12 46 L8 38 Z"
-                fill="#2a1a14"
-                stroke="#0a0604"
-                strokeWidth="0.5"
-              />
-              {/* 살짝 따뜻한 림라이트 */}
-              <circle cx="14" cy="8" r="2" fill="rgba(255, 200, 130, 0.4)" />
-            </svg>
+            <PersonSilhouette
+              variant={charVariantRef.current ?? 0}
+              scale={charScaleRef.current ?? 0.6}
+            />
           </div>
         </>
       )}

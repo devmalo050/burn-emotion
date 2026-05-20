@@ -980,7 +980,16 @@ export function BonfireScene() {
             if (meteor.gameState !== 'idle') return;
             if (jump.gameState !== 'idle') return;
             const spot = mySpotRef.current;
-            jump.start(spot ? { x: spot.x, y: spot.y } : undefined);
+            jump.start(
+              spot
+                ? {
+                    x: spot.x,
+                    y: spot.y,
+                    variant: spot.variant,
+                    scale: spot.scale,
+                  }
+                : undefined,
+            );
           }}
           ariaLabel="인내의 숲 시작"
         />
