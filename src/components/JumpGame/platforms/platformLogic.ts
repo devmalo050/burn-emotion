@@ -23,6 +23,7 @@ export interface Platform {
   bornY?: number; // lift 기준 y / swing 최하점 y
   phase?: number; // 사인파 위상 오프셋
   swingAngle?: number; // swing — 현재 진자 각도 (rad). 사슬 비주얼 기울임용
+  prevSurfaceY?: number; // 직전 프레임 y — 움직이는 발판 충돌 판정(상대운동)용
   breakAt?: number | null; // breakable — 밟힌 시각(performance.now), null=미밟음
   rollDir?: -1 | 1; // rolling — 미는 방향
 }
@@ -109,8 +110,10 @@ export function initPlatformFields(p: Platform): void {
 }
 
 // 움직이는 발판의 x/y 를 현재 시각 기준으로 갱신 (매 프레임).
+// 갱신 전 y 를 prevSurfaceY 에 저장 — 충돌 판정이 발판·캐릭터 상대운동을 보게.
 export function updatePlatformPosition(p: Platform, now: number): void {
   if (p.kind === 'drift' && p.bornX != null && p.phase != null) {
+    p.prevSurfaceY = p.y;
     p.x = p.bornX + Math.sin(now / DRIFT_PERIOD + p.phase) * DRIFT_AMP;
   } else if (
     p.kind === 'swing' &&
@@ -119,11 +122,13 @@ export function updatePlatformPosition(p: Platform, now: number): void {
     p.phase != null
   ) {
     // 진자 — 앵커 고정, plank 가 호를 그림. θ=0 이 최하점.
+    p.prevSurfaceY = p.y;
     const angle = SWING_MAX_ANGLE * Math.sin(now / SWING_PERIOD + p.phase);
     p.x = p.bornX + Math.sin(angle) * SWING_LEN - p.width / 2;
     p.y = p.bornY + SWING_LEN * (1 - Math.cos(angle));
     p.swingAngle = angle;
   } else if (p.kind === 'lift' && p.bornY != null && p.phase != null) {
+    p.prevSurfaceY = p.y;
     p.y = p.bornY + Math.sin(now / LIFT_PERIOD + p.phase) * LIFT_AMP;
   }
 }

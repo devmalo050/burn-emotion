@@ -824,9 +824,22 @@ export function BonfireScene() {
   // 위로 올라가는 효과. JumpGameOverlay/MeteorOverlay 는 wrapper 밖이라 영향 없음.
   const sceneShiftRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
+    const el = sceneShiftRef.current;
     if (jump.gameState !== 'playing' && jump.gameState !== 'gameover') {
-      if (sceneShiftRef.current) sceneShiftRef.current.style.transform = '';
+      if (el) {
+        el.style.transform = '';
+        el.style.maskImage = '';
+        el.style.webkitMaskImage = '';
+      }
       return;
+    }
+    // 점프 중 — 메인 씬 위쪽을 페이드해 끝선이 드러나지 않게.
+    // 캐릭터가 올라가면 메인 씬이 카메라 따라 내려가는데, 유한한 씬의 위쪽 끝과
+    // 점프 배경 사이에 경계선이 생기던 것을 mask 로 부드럽게 사라지게 함.
+    if (el) {
+      const fade = 'linear-gradient(0deg, #000 0%, #000 68%, transparent 92%)';
+      el.style.maskImage = fade;
+      el.style.webkitMaskImage = fade;
     }
     return jump.registerFrameListener(() => {
       if (sceneShiftRef.current) {

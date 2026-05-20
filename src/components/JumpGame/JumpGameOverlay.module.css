@@ -33,38 +33,28 @@
   right: 0;
   pointer-events: none;
 }
-.bgLayerSky {
-  /* bottom ~ height: 500 ~ 3000 (sky 시작) */
+/* 색 단계 — 하나의 연속 그라데이션. 경계 stop 사이가 자연스럽게 섞임.
+   bottom 300 ~ 108800 (height 108500). stop % = (worldY-300)/108500. */
+.bgGradient {
   background: linear-gradient(
     0deg,
     transparent 0%,
-    rgba(8, 6, 28, 0.55) 30%,
-    rgba(10, 12, 36, 0.85) 70%,
-    rgba(10, 18, 46, 0.95) 100%
+    rgba(8, 6, 28, 0.55) 0.7%,
+    rgba(10, 12, 36, 0.85) 1.6%,
+    rgba(10, 18, 46, 0.95) 2.3%,
+    rgba(14, 26, 70, 0.95) 4%,
+    rgba(8, 16, 50, 0.97) 6.2%,
+    rgba(2, 6, 22, 0.98) 7.8%,
+    #06051a 13.4%,
+    #020412 20.7%,
+    #020310 26.3%,
+    rgba(28, 10, 44, 0.96) 48%,
+    rgba(12, 28, 48, 0.96) 71%,
+    rgba(36, 14, 52, 0.97) 100%
   );
 }
-.bgLayerAtm {
-  /* 3000 ~ 9000: 대기권 상층 */
-  background: linear-gradient(
-    0deg,
-    rgba(10, 18, 46, 0.95) 0%,
-    rgba(14, 26, 70, 0.95) 30%,
-    rgba(8, 16, 50, 0.97) 70%,
-    rgba(2, 6, 22, 0.98) 100%
-  );
-}
-.bgLayerSpace {
-  /* 9000 ~ 28000: 우주 */
-  background:
-    radial-gradient(circle at 25% 30%, rgba(80, 30, 120, 0.22) 0%, transparent 28%),
-    radial-gradient(circle at 75% 60%, rgba(20, 80, 140, 0.18) 0%, transparent 35%),
-    linear-gradient(0deg, rgba(2, 6, 22, 0.98) 0%, #06051a 30%, #020412 70%, #000 100%);
-}
-/* 우주 안에 별이 한가득 — repeating background pattern */
-.bgLayerSpace::after {
-  content: '';
-  position: absolute;
-  inset: 0;
+/* 우주 별 — 위·아래 가장자리 mask 로 페이드해 갑자기 나타나지 않게 */
+.bgStars {
   background-image:
     radial-gradient(1.2px 1.2px at 8% 12%, #fff 50%, transparent 60%),
     radial-gradient(1.6px 1.6px at 22% 36%, #fff 50%, transparent 60%),
@@ -81,14 +71,22 @@
   background-size: 100% 800px;
   background-repeat: repeat;
   opacity: 0.85;
+  -webkit-mask-image: linear-gradient(0deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
+  mask-image: linear-gradient(0deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
 }
-.bgLayerGlitch {
-  /* 28000+: 뇌절. height 매우 큰 영역 */
-  background:
-    repeating-linear-gradient(0deg, rgba(255, 0, 200, 0.06) 0px, transparent 2px, transparent 4px, rgba(0, 255, 230, 0.06) 6px),
-    linear-gradient(0deg, #000 0%, rgba(120, 30, 200, 0.6) 30%, rgba(0, 200, 230, 0.5) 60%, rgba(255, 100, 230, 0.7) 100%);
+/* glitch 스캔라인 — 아래 가장자리 mask 로 페이드. 네온 색조는 bgGradient 가 담당. */
+.bgGlitch {
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(255, 0, 200, 0.06) 0px,
+    transparent 2px,
+    transparent 4px,
+    rgba(0, 255, 230, 0.06) 6px
+  );
   mix-blend-mode: screen;
   animation: jumpGlitchHue 1.6s linear infinite;
+  -webkit-mask-image: linear-gradient(0deg, transparent 0%, #000 14%);
+  mask-image: linear-gradient(0deg, transparent 0%, #000 14%);
 }
 @keyframes jumpGlitchHue {
   0%   { filter: hue-rotate(0deg); }

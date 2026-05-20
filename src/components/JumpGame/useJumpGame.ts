@@ -311,10 +311,15 @@ export function useJumpGame({ myNick }: Options): JumpGameApi {
         }
       }
 
-      // 중력 + 수직 이동
+      // 중력 + 수직 이동 — 발판 위에 서 있을(onGround) 땐 중력 미적용.
+      // 그래야 basic 은 제자리, 움직이는 발판은 동승 유지. 떨어지거나 점프 중일 때만
+      // 중력을 받음. (서 있는데 중력으로 발판을 파고들면 lift 하강 시 재착지 판정이
+      // 어긋나 발판을 통과해 버리는 버그가 있었음.)
       const prevY = charYRef.current;
-      charVyRef.current -= GRAVITY * dt;
-      charYRef.current += charVyRef.current * dt;
+      if (!charOnGroundRef.current) {
+        charVyRef.current -= GRAVITY * dt;
+        charYRef.current += charVyRef.current * dt;
+      }
 
       // 발판 충돌 — 떨어지는 중(vy < 0) 일 때만, 발판 위에서 아래로 통과하는 순간
       let landed = false;
@@ -323,8 +328,11 @@ export function useJumpGame({ myNick }: Options): JumpGameApi {
           // 캐릭터가 발판 가로 범위 안
           if (charXRef.current < p.x - 4) continue;
           if (charXRef.current > p.x + p.width + 4) continue;
-          // 이전 frame 발판 위, 현재 frame 발판 통과
-          if (prevY >= p.y && charYRef.current <= p.y) {
+          // 캐릭터·발판 상대운동으로 판정 — 직전 프레임엔 발판 위(prevY ≥ 발판 직전 y),
+          // 이번 프레임엔 발판 통과(charY ≤ 발판 현재 y). 움직이는 발판이 캐릭터를
+          // 추월해도 놓치지 않음.
+          const platPrevY = p.prevSurfaceY ?? p.y;
+          if (prevY >= platPrevY && charYRef.current <= p.y) {
             if (p.kind === 'hot') {
               // 뜨거운 발판 — 즉사
               setLastScoreHeight(maxYRef.current / 50);

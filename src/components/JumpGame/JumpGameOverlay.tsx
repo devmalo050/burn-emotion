@@ -96,22 +96,21 @@ export function JumpGameOverlay({ api, myNick }: Props) {
           className={styles.bgWorld}
           style={{ bottom: worldBaseY }}
         >
-          {/* 각 layer: world 좌표 bottom + height (px) */}
+          {/* 색 단계는 하나의 연속 그라데이션 — 경계 선 없이 부드럽게 전환.
+              모닥불(300) → 하늘 → 대기권 → 우주 → 뇌절(108800). */}
           <div
-            className={`${styles.bgLayer} ${styles.bgLayerSky}`}
-            style={{ bottom: 300, height: 2500 }}
+            className={`${styles.bgLayer} ${styles.bgGradient}`}
+            style={{ bottom: 300, height: 108500 }}
           />
+          {/* 별 패턴 — 우주 구간. 위·아래 가장자리 mask 로 페이드 */}
           <div
-            className={`${styles.bgLayer} ${styles.bgLayerAtm}`}
-            style={{ bottom: 2800, height: 6000 }}
-          />
-          <div
-            className={`${styles.bgLayer} ${styles.bgLayerSpace}`}
+            className={`${styles.bgLayer} ${styles.bgStars}`}
             style={{ bottom: 8800, height: 20000 }}
           />
+          {/* glitch 스캔라인 — 뇌절 구간. 별 구간과 크게 겹쳐 mask 로 부드럽게 교차 */}
           <div
-            className={`${styles.bgLayer} ${styles.bgLayerGlitch}`}
-            style={{ bottom: 28800, height: 80000 }}
+            className={`${styles.bgLayer} ${styles.bgGlitch}`}
+            style={{ bottom: 20000, height: 88800 }}
           />
         </div>
       )}
