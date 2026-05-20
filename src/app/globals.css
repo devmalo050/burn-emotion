@@ -274,6 +274,16 @@ html, body {
   100% { transform: translate(var(--end-x), var(--end-y)); opacity: 0; }
 }
 
+@keyframes meteorCountdownPulse {
+  0% { transform: scale(0.4); opacity: 0; }
+  30% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes meteorOverlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 /* === Responsive trim === */
 @media (max-width: 820px) {
   .feed { display: none; }

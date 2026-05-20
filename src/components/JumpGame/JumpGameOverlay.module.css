@@ -1,0 +1,307 @@
+/* 인내의 숲 게임 오버레이 — 게임 active 시 fullscreen 위로 덮음.
+   배경은 풍경 단계가 별도 추가됨 (TBD). 일단 다크 + 모닥불 톤. */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  overflow: hidden;
+  /* 메인 화면(모닥불·별·캐릭터) 그대로 보이도록 배경 투명.
+     발판이 본인 자리에서 위로 솟아나며 캐릭터가 올라가는 컨셉. */
+  background: transparent;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* === 평행 스크롤 배경 wrapper — world wrapper 와 같은 transform 으로 카메라 따라 흐름 ===
+   안 layer 들은 wrapper bottom: worldBaseY 위로 절대 위치(bottom px). 캐릭터가 위로 가면
+   wrapper translateY(cameraY) 로 wrapper 가 아래로 → 위쪽 layer 가 viewport 에 내려옴. */
+.bgWorld {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;   /* JS 에서 bottom: worldBaseY 로 인라인 설정 */
+  height: 0;
+  pointer-events: none;
+  z-index: 101;
+  will-change: transform;
+}
+/* 각 layer 는 wrapper 안 절대 위치. bottom + height 픽셀 단위 (world 좌표). */
+.bgLayer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+.bgLayerSky {
+  /* bottom ~ height: 500 ~ 3000 (sky 시작) */
+  background: linear-gradient(
+    0deg,
+    transparent 0%,
+    rgba(8, 6, 28, 0.55) 30%,
+    rgba(10, 12, 36, 0.85) 70%,
+    rgba(10, 18, 46, 0.95) 100%
+  );
+}
+.bgLayerAtm {
+  /* 3000 ~ 9000: 대기권 상층 */
+  background: linear-gradient(
+    0deg,
+    rgba(10, 18, 46, 0.95) 0%,
+    rgba(14, 26, 70, 0.95) 30%,
+    rgba(8, 16, 50, 0.97) 70%,
+    rgba(2, 6, 22, 0.98) 100%
+  );
+}
+.bgLayerSpace {
+  /* 9000 ~ 28000: 우주 */
+  background:
+    radial-gradient(circle at 25% 30%, rgba(80, 30, 120, 0.22) 0%, transparent 28%),
+    radial-gradient(circle at 75% 60%, rgba(20, 80, 140, 0.18) 0%, transparent 35%),
+    linear-gradient(0deg, rgba(2, 6, 22, 0.98) 0%, #06051a 30%, #020412 70%, #000 100%);
+}
+/* 우주 안에 별이 한가득 — repeating background pattern */
+.bgLayerSpace::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1.2px 1.2px at 8% 12%, #fff 50%, transparent 60%),
+    radial-gradient(1.6px 1.6px at 22% 36%, #fff 50%, transparent 60%),
+    radial-gradient(1px 1px at 38% 8%, #d8e6ff 50%, transparent 60%),
+    radial-gradient(1.4px 1.4px at 52% 28%, #fff 50%, transparent 60%),
+    radial-gradient(1.2px 1.2px at 68% 52%, #fff 50%, transparent 60%),
+    radial-gradient(1px 1px at 78% 18%, #d8e6ff 50%, transparent 60%),
+    radial-gradient(1.6px 1.6px at 88% 70%, #fff 50%, transparent 60%),
+    radial-gradient(1.2px 1.2px at 16% 78%, #fff 50%, transparent 60%),
+    radial-gradient(1px 1px at 44% 88%, #ffe6c0 50%, transparent 60%),
+    radial-gradient(1.4px 1.4px at 62% 92%, #fff 50%, transparent 60%),
+    radial-gradient(1.2px 1.2px at 92% 32%, #d8e6ff 50%, transparent 60%),
+    radial-gradient(1px 1px at 6% 46%, #fff 50%, transparent 60%);
+  background-size: 100% 800px;
+  background-repeat: repeat;
+  opacity: 0.85;
+}
+.bgLayerGlitch {
+  /* 28000+: 뇌절. height 매우 큰 영역 */
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 0, 200, 0.06) 0px, transparent 2px, transparent 4px, rgba(0, 255, 230, 0.06) 6px),
+    linear-gradient(0deg, #000 0%, rgba(120, 30, 200, 0.6) 30%, rgba(0, 200, 230, 0.5) 60%, rgba(255, 100, 230, 0.7) 100%);
+  mix-blend-mode: screen;
+  animation: jumpGlitchHue 1.6s linear infinite;
+}
+@keyframes jumpGlitchHue {
+  0%   { filter: hue-rotate(0deg); }
+  100% { filter: hue-rotate(360deg); }
+}
+
+/* 발판들이 들어가는 wrapper — transform 으로 카메라 스크롤 */
+.world {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  will-change: transform;
+  z-index: 102; /* 풍경 layer(101) 위, 캐릭터(105) 아래 */
+}
+
+.platform {
+  position: absolute;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #6b4226 0%, #3e2614 60%, #1f130a 100%);
+  box-shadow:
+    inset 0 -3px 6px rgba(0, 0, 0, 0.6),
+    inset 0 2px 4px rgba(255, 160, 70, 0.12),
+    0 3px 10px rgba(0, 0, 0, 0.5);
+}
+
+/* 캐릭터 — 32×48 단순 실루엣. transform 으로 매 프레임 위치 갱신. */
+.char {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 32px;
+  height: 48px;
+  pointer-events: none;
+  will-change: transform;
+  z-index: 105;
+  filter: drop-shadow(0 0 8px rgba(255, 200, 130, 0.45));
+}
+.char svg { display: block; width: 100%; height: 100%; }
+
+/* HUD — 우상단 높이 표시 */
+.hud {
+  position: fixed;
+  top: 24px;
+  right: 32px;
+  color: #ffd590;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+  font-variant-numeric: tabular-nums;
+  z-index: 110;
+  pointer-events: none;
+}
+
+/* 카운트다운 (countdown state) */
+.countdown {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 36px;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 108;
+  pointer-events: none;
+}
+.countdownNum {
+  font-size: 200px;
+  font-weight: 800;
+  color: #ffd590;
+  line-height: 1;
+  text-shadow:
+    0 8px 40px rgba(0, 0, 0, 0.8),
+    0 0 60px rgba(255, 140, 58, 0.4);
+  animation: jumpCountdownPulse 1s ease-out both;
+}
+@keyframes jumpCountdownPulse {
+  0%   { transform: scale(0.4); opacity: 0; }
+  30%  { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* 가이드 — 화살표 + 스페이스 */
+.guide {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  color: rgba(239, 232, 217, 0.85);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+}
+.keyGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.keyRow {
+  display: flex;
+  gap: 4px;
+}
+.keyBox {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid rgba(255, 213, 144, 0.55);
+  border-radius: 6px;
+  background: rgba(255, 213, 144, 0.08);
+  color: #ffd590;
+  font-size: 18px;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), inset 0 -2px 0 rgba(0, 0, 0, 0.3);
+}
+.keyBoxWide {
+  width: 168px;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+}
+
+/* 결과/리더보드 모달 */
+.modalBg {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 115;
+  animation: jumpOverlayIn 0.4s ease-out;
+  pointer-events: auto;
+}
+.modal {
+  position: relative;
+  background: linear-gradient(180deg, rgba(28, 16, 32, 0.96), rgba(12, 8, 16, 0.96));
+  border: 1px solid rgba(255, 213, 144, 0.25);
+  border-radius: 16px;
+  padding: 40px 48px;
+  min-width: 360px;
+  max-width: 520px;
+  color: #efe8d9;
+  text-align: center;
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.6),
+    0 0 60px rgba(255, 140, 58, 0.12);
+}
+.modalClose {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: rgba(239, 232, 217, 0.6);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modalClose:hover {
+  color: #efe8d9;
+  background: rgba(255, 255, 255, 0.08);
+}
+.modalLabel {
+  font-size: 14px;
+  opacity: 0.7;
+  letter-spacing: 0.12em;
+}
+.modalScore {
+  font-size: 56px;
+  font-weight: 700;
+  color: #ffd590;
+  margin: 12px 0 24px;
+  font-variant-numeric: tabular-nums;
+}
+.modalTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: #ffd590;
+  margin: 4px 0 24px;
+  letter-spacing: 0.04em;
+}
+.top10Label {
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  opacity: 0.7;
+  margin-bottom: 10px;
+}
+.top10Row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  align-items: center;
+  gap: 8px;
+}
+.top10Empty {
+  font-size: 13px;
+  opacity: 0.5;
+  text-align: center;
+  padding: 8px 0;
+}
+
+@keyframes jumpOverlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}

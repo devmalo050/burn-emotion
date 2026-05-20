@@ -116,6 +116,18 @@ export function MeteorOverlay({ api, myNick }: Props) {
               }}
             >
               <div
+                style={{
+                  fontSize: 42,
+                  fontWeight: 700,
+                  color: '#ffd590',
+                  letterSpacing: '0.14em',
+                  textShadow: '0 4px 20px rgba(0,0,0,0.7), 0 0 30px rgba(255,140,58,0.3)',
+                  marginBottom: -20,
+                }}
+              >
+                별똥별 피하기
+              </div>
+              <div
                 key={countdownNum}
                 style={{
                   fontSize: 200,
@@ -124,7 +136,7 @@ export function MeteorOverlay({ api, myNick }: Props) {
                   lineHeight: 1,
                   textShadow:
                     '0 8px 40px rgba(0,0,0,0.8), 0 0 60px rgba(255,140,58,0.4)',
-                  animation: 'meteorCountdownPulse 1s ease-out',
+                  animation: 'meteorCountdownPulse 1s ease-out both',
                 }}
               >
                 {countdownNum}
@@ -332,17 +344,6 @@ export function MeteorOverlay({ api, myNick }: Props) {
         </div>
       )}
 
-      <style>{`
-        @keyframes meteorCountdownPulse {
-          0% { transform: scale(0.4); opacity: 0; }
-          30% { transform: scale(1.15); opacity: 1; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-        @keyframes meteorOverlayIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-      `}</style>
     </>
   );
 }

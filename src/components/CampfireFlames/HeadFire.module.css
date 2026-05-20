@@ -1,0 +1,46 @@
+/* 머리 위 작은 캠프파이어 — outer + core 메탈볼 합성. silhouette 안 absolute. */
+
+.wrap {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translate(-50%, 30px);
+  width: 60px;
+  height: 80px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.outer {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 60px;
+  height: 80px;
+  transform: translateX(-50%);
+  filter: blur(2px) contrast(11) saturate(1.15);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+.outer canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.core {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 32px;
+  height: 44px;
+  transform: translateX(-50%);
+  filter: blur(1.5px) contrast(8);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+.core canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
