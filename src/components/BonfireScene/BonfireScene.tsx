@@ -120,12 +120,8 @@ export function BonfireScene() {
     keys: new Set<string>(),
   });
 
-  // 하늘의 별 데이터 — StarrySky 와 별똥별 게임 burst 가 공유.
+  // 하늘의 별 데이터 — StarrySky 표시용.
   const skyStars = useMemo(() => makeStars(180), []);
-  // 50초/100초 burst 로 떨어진 별 id 집합. 떨어진 별은 표시 안 함.
-  const [hiddenStarIds, setHiddenStarIds] = useState<ReadonlySet<number>>(
-    () => new Set<number>(),
-  );
 
   const fireRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -187,8 +183,6 @@ export function BonfireScene() {
     myNick,
     spotRef: mySpotRef,
     motionRef,
-    skyStars,
-    setHiddenStarIds,
   });
 
   // === 우주를 줄게 점프맵 (이스터에그) ===
@@ -860,7 +854,6 @@ export function BonfireScene() {
       >
       <StarrySky
         stars={skyStars}
-        hiddenStarIds={hiddenStarIds}
         onMoonClick={() => {
           if (jump.gameState !== 'idle') return;
           if (meteor.gameState !== 'idle') return;

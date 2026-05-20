@@ -1,9 +1,14 @@
 'use client';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase/client';
-import type { Star } from '@/components/StarrySky/StarrySky';
 
 export type MeteorGameState = 'idle' | 'countdown' | 'playing' | 'gameover';
+
+// burst — 50초마다 별똥별 다발이 쏟아짐. k 번째 burst 개수 = BURST_BASE * k
+// (상한 BURST_MAX_COUNT). 50초 54 → 100초 108 → 150초 162 …
+const BURST_INTERVAL = 50000;
+const BURST_BASE = 54;
+const BURST_MAX_COUNT = 270;
 export interface Meteor {
   id: number;
   x: number;
@@ -31,8 +36,6 @@ interface Options {
   myNick: string;
   spotRef: RefObject<CharSpot | null>;
   motionRef: RefObject<CharMotion>;
-  skyStars: Star[];
-  setHiddenStarIds: React.Dispatch<React.SetStateAction<ReadonlySet<number>>>;
 }
 
 export interface MeteorGameApi {
@@ -49,7 +52,7 @@ export interface MeteorGameApi {
 }
 
 export function useMeteorGame(opts: Options): MeteorGameApi {
-  const { myNick, spotRef, motionRef, skyStars, setHiddenStarIds } = opts;
+  const { myNick, spotRef, motionRef } = opts;
 
   const [gameState, setGameState] = useState<MeteorGameState>('idle');
   const [countdownNum, setCountdownNum] = useState(3);
@@ -96,10 +99,9 @@ export function useMeteorGame(opts: Options): MeteorGameApi {
       setGameState('idle');
       setMeteors([]);
       setLastScoreSec(null);
-      setHiddenStarIds(new Set());
     }
     setLeaderboardOpen(false);
-  }, [gameState, setHiddenStarIds]);
+  }, [gameState]);
 
   // === 마운트 시 TOP10 fetch ===
   useEffect(() => {
@@ -145,12 +147,8 @@ export function useMeteorGame(opts: Options): MeteorGameApi {
     pauseAccumRef.current = 0;
     pausedAtRef.current =
       document.visibilityState === 'hidden' ? startAt : null;
-    let burst50 = false;
-    let burst100 = false;
-    const shuffled = [...skyStars].sort(() => Math.random() - 0.5);
-    const fallFirstIds = new Set<number>(
-      shuffled.slice(0, Math.floor(skyStars.length * 0.3)).map((s) => s.id),
-    );
+    let nextBurstAt = BURST_INTERVAL;
+    let burstNum = 0;
     const list: Meteor[] = [];
 
     const loop = (now: number) => {
@@ -159,38 +157,29 @@ export function useMeteorGame(opts: Options): MeteorGameApi {
       const elapsed = now - startAt - pauseAccumRef.current;
       setSurvivedMs(elapsed);
 
-      // burst 헬퍼 — 특정 별 그룹을 그 자리에서 별똥별로 변환.
-      // 한 번에 많이 떨어지는 만큼 vy 는 천천히 — 일반 spawn 의 절반 정도.
-      const dropStars = (starsToDrop: Star[], timeAtMs: number) => {
+      // burst 헬퍼 — 화면 맨 위에서 별똥별 다발이 쏟아짐. 화면 위 영역에 y 를
+      // 흩어 순차적으로 진입하게. 한 번에 많이 떨어지므로 vy 는 천천히.
+      const dropMeteors = (count: number, timeAtMs: number) => {
         const sw = window.innerWidth;
-        const sh = window.innerHeight;
-        const skyH = sh * 0.6;
+        const skyH = window.innerHeight * 0.6;
         const speedBoost = (timeAtMs / 70000) * 0.25;
-        const droppedIds: number[] = [];
-        for (const s of starsToDrop) {
+        for (let i = 0; i < count; i++) {
           list.push({
             id: meteorIdRef.current++,
-            x: (s.x / 100) * sw,
-            y: (s.y / 100) * skyH,
+            x: Math.random() * sw,
+            y: -40 - Math.random() * skyH,
             vx: (Math.random() - 0.5) * 0.2,
             vy: 0.22 + Math.random() * 0.18 + speedBoost,
           });
-          droppedIds.push(s.id);
         }
-        setHiddenStarIds((prev) => {
-          const next = new Set(prev);
-          for (const id of droppedIds) next.add(id);
-          return next;
-        });
       };
 
-      if (!burst50 && elapsed >= 50000) {
-        burst50 = true;
-        dropStars(skyStars.filter((s) => fallFirstIds.has(s.id)), 50000);
-      }
-      if (!burst100 && elapsed >= 100000) {
-        burst100 = true;
-        dropStars(skyStars.filter((s) => !fallFirstIds.has(s.id)), 100000);
+      // 50초마다 burst — k 번째는 BURST_BASE * k 개 (상한까지).
+      while (elapsed >= nextBurstAt) {
+        burstNum += 1;
+        const count = Math.min(BURST_BASE * burstNum, BURST_MAX_COUNT);
+        dropMeteors(count, nextBurstAt);
+        nextBurstAt += BURST_INTERVAL;
       }
 
       // 난이도 곡선 — 점점 빨라짐
