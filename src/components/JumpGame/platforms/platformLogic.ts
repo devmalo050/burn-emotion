@@ -1,4 +1,4 @@
-// 인내의 숲 발판 종류 — 데이터 모델 + 스폰 분포 + 위치 갱신.
+// 우주를 줄게 발판 종류 — 데이터 모델 + 스폰 분포 + 위치 갱신.
 // 새 발판 추가: 여기 KIND_SPAWN 항목 + PlatformDesigns 컴포넌트만 추가하면 됨.
 // 착지 시 효과(spring 부스트·hot 즉사·rolling 밀기·breakable 소멸)는 캐릭터 물리와
 // 강결합이라 useJumpGame RAF 안에서 처리 — 여기 상수만 export.

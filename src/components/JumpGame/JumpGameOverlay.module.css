@@ -1,4 +1,4 @@
-/* 인내의 숲 게임 오버레이 — 게임 active 시 fullscreen 위로 덮음.
+/* 우주를 줄게 게임 오버레이 — 게임 active 시 fullscreen 위로 덮음.
    배경은 풍경 단계가 별도 추가됨 (TBD). 일단 다크 + 모닥불 톤. */
 
 .overlay {
@@ -148,6 +148,17 @@
   background: rgba(0, 0, 0, 0.35);
   z-index: 108;
   pointer-events: none;
+}
+/* 게임 이름 — 카운트다운 숫자 위에 */
+.gameTitle {
+  font-size: 42px;
+  font-weight: 700;
+  color: #ffd590;
+  letter-spacing: 0.14em;
+  text-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.7),
+    0 0 30px rgba(255, 140, 58, 0.3);
+  margin-bottom: -20px;
 }
 .countdownNum {
   font-size: 200px;

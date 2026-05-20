@@ -42,7 +42,7 @@ export function JumpGameOverlay({ api, myNick }: Props) {
   // 발판 wrapper 는 CSS bottom: worldBaseY 로 두고, 안 발판은 bottom: p.y.
   // 카메라 따라 위로: wrapper translateY(cameraY).
   useEffect(() => {
-    if (gameState !== 'playing' && gameState !== 'gameover') return;
+    if (gameState === 'idle') return;
     const onFrame = () => {
       const sh = window.innerHeight;
       if (worldRef.current) {
@@ -81,6 +81,9 @@ export function JumpGameOverlay({ api, myNick }: Props) {
         }
       }
     };
+    // 즉시 1회 — countdown 중엔 RAF 가 안 돌므로 캐릭터·발판을 시작 위치에 바로 배치.
+    onFrame();
+    if (gameState !== 'playing' && gameState !== 'gameover') return;
     return registerFrameListener(onFrame);
   }, [gameState, registerFrameListener, charXRef, charYRef, cameraYRef, charScaleRef, platformsRef, worldBaseYRef]);
 
@@ -162,6 +165,7 @@ export function JumpGameOverlay({ api, myNick }: Props) {
       {/* 카운트다운 */}
       {gameState === 'countdown' && (
         <div className={styles.countdown}>
+          <div className={styles.gameTitle}>우주를 줄게</div>
           <div key={countdownNum} className={styles.countdownNum}>
             {countdownNum}
           </div>
@@ -202,7 +206,7 @@ export function JumpGameOverlay({ api, myNick }: Props) {
                 </div>
               </>
             ) : (
-              <div className={styles.modalTitle}>인내의 숲</div>
+              <div className={styles.modalTitle}>우주를 줄게</div>
             )}
 
             <div className={styles.top10Label}>TOP 10</div>

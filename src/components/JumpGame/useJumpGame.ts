@@ -32,7 +32,7 @@ export interface LeaderEntry {
 }
 
 /**
- * 인내의 숲 — 위로 끝없이 점프하며 올라가는 점프맵.
+ * 우주를 줄게 — 위로 끝없이 점프하며 올라가는 점프맵.
  * 좌표계: world.y 는 시작점에서 위로 양수. 카메라가 캐릭터 따라 위로 스크롤.
  * 도달한 최고 높이(m) 가 점수.
  */
@@ -409,13 +409,13 @@ export function useJumpGame({ myNick }: Options): JumpGameApi {
       while (topY < targetSpawnY) {
         const difficulty = Math.min(1, maxYRef.current / 4000);
         const kind = pickPlatformKind(difficulty, lastKind);
+        // hot 발판은 앞·뒤 발판과 가깝게 — 수직(간격 ≤78)·수평(offset ≤±80)
+        // 둘 다 좁혀서, 이전 발판에서 hot 을 건너뛰어 그 위 발판으로 점프할 수 있게.
+        // 수직만 좁히면 hot 너머 발판이 옆으로 멀 때 점프 체공 안에 못 닿아 죽었음.
+        const hotAdjacent = kind === 'hot' || lastKind === 'hot';
         // 수직 간격 — 점프 최대 도달 ~196px. 초반 90~130, 후반 150~190.
-        // hot 발판은 앞·뒤 간격을 좁혀(≤78), 이전 발판에서 hot 을 건너뛰어
-        // 그 위 발판으로 직접 점프할 수 있게 함 (78+78=156 < 196).
         let gap = 90 + Math.random() * 40 + difficulty * 60;
-        if (kind === 'hot' || lastKind === 'hot') {
-          gap = Math.min(gap, 78);
-        }
+        if (hotAdjacent) gap = Math.min(gap, 78);
         topY += gap;
         lastKind = kind;
         // 발판 폭 — 후반엔 40~70 까지 좁아짐. 단 rolling 은 고정(밀려도 버틸 공간).
@@ -425,7 +425,8 @@ export function useJumpGame({ myNick }: Options): JumpGameApi {
           kind === 'rolling'
             ? ROLLING_WIDTH
             : minW + Math.random() * (maxW - minW);
-        const offset = (Math.random() - 0.5) * 440;
+        const offsetRange = hotAdjacent ? 160 : 440;
+        const offset = (Math.random() - 0.5) * offsetRange;
         // 움직이는 발판은 가로로 흔들리므로 화면 밖 안 나가게 여유를 둠.
         const margin = kind === 'drift' || kind === 'swing' ? 20 + MAX_X_AMP : 20;
         lastSpawnX = Math.max(

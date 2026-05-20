@@ -191,7 +191,7 @@ export function BonfireScene() {
     setHiddenStarIds,
   });
 
-  // === 인내의 숲 점프맵 (이스터에그) ===
+  // === 우주를 줄게 점프맵 (이스터에그) ===
   const jump = useJumpGame({ myNick });
 
   // === spawn potato AT the fire — stable slot so existing potatoes
@@ -979,7 +979,7 @@ export function BonfireScene() {
       {/* Fire glow */}
       {/* fireGlow / 모닥불 주변 밝아지는 효과 제거 — CampfireFlames 캔버스 자체 글로우로 충분 */}
 
-      {/* 열기구 — 인내의 숲(점프맵) 진입 트리거. 좌측 상단(별똥별 달의 좌우 대칭) 떠 있음. */}
+      {/* 열기구 — 우주를 줄게(점프맵) 진입 트리거. 좌측 상단(별똥별 달의 좌우 대칭) 떠 있음. */}
       <div
         style={{
           position: 'absolute',
@@ -1004,7 +1004,7 @@ export function BonfireScene() {
                 : undefined,
             );
           }}
-          ariaLabel="인내의 숲 시작"
+          ariaLabel="우주를 줄게 시작"
         />
       </div>
 
