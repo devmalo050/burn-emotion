@@ -1,7 +1,4 @@
--- 인내의 숲(점프맵) 이스터에그 — 글로벌 TOP 10 리더보드.
--- 점수는 도달한 높이(미터). 클수록 좋음.
--- Supabase Dashboard → SQL Editor 에 통째로 실행 (재실행 안전).
-
+-- 우주를 줄게(점프맵) — 글로벌 TOP 10 리더보드. psql 로 통째 실행 (재실행 안전).
 drop function if exists public.submit_jump_record(text, numeric);
 drop function if exists public.get_jump_top10();
 
@@ -12,21 +9,12 @@ create table if not exists public.jump_leaderboard (
   created_at timestamptz not null default now()
 );
 
-alter table public.jump_leaderboard enable row level security;
-
-drop policy if exists "read jump_leaderboard" on public.jump_leaderboard;
-create policy "read jump_leaderboard"
-  on public.jump_leaderboard for select using (true);
-
--- INSERT + TOP10 외 즉시 삭제 + TOP10 반환 (cap-and-prune)
 create function public.submit_jump_record(
   p_nick text,
   p_height numeric
 )
 returns table(nick text, height numeric)
 language plpgsql
-security definer
-set search_path = public
 as $$
 begin
   if p_nick is null or length(trim(p_nick)) = 0 or length(p_nick) > 64 then
@@ -58,16 +46,9 @@ create function public.get_jump_top10()
 returns table(nick text, height numeric)
 language sql
 stable
-security definer
-set search_path = public
 as $$
   select nick, height
   from public.jump_leaderboard
   order by height desc, created_at asc
   limit 10
 $$;
-
-revoke all on function public.submit_jump_record(text, numeric) from public;
-revoke all on function public.get_jump_top10() from public;
-grant execute on function public.submit_jump_record(text, numeric) to anon, authenticated;
-grant execute on function public.get_jump_top10() to anon, authenticated;
