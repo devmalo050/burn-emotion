@@ -1564,7 +1564,7 @@ git commit -m "chore: Supabase 클라이언트·의존성 제거"
 - Create: `Dockerfile`
 - Create: `.dockerignore`
 
-- [ ] **Step 1: next.config.ts 수정**
+- [x] **Step 1: next.config.ts 수정**
 
 `next.config.ts` 전체를 다음으로 교체:
 
@@ -1578,7 +1578,7 @@ const nextConfig: NextConfig = {
 export default nextConfig;
 ```
 
-- [ ] **Step 2: .dockerignore 작성**
+- [x] **Step 2: .dockerignore 작성**
 
 `.dockerignore`:
 
@@ -1593,7 +1593,7 @@ docs
 .env*
 ```
 
-- [ ] **Step 3: Dockerfile 작성**
+- [x] **Step 3: Dockerfile 작성**
 
 `Dockerfile`:
 
@@ -1622,17 +1622,17 @@ EXPOSE 3000
 CMD ["node", "server.js"]
 ```
 
-- [ ] **Step 4: 로컬 standalone 빌드 검증**
+- [x] **Step 4: 로컬 standalone 빌드 검증**
 
 Run: `npm run build`
 Expected: 빌드 성공, `.next/standalone/server.js` 생성.
 
-- [ ] **Step 5: 로컬 Docker 빌드 검증**
+- [x] **Step 5: 로컬 Docker 빌드 검증**
 
 Run: `docker build --build-arg NEXT_PUBLIC_WS_URL=ws://localhost:8080 -t burn-emotion-web .`
 Expected: 빌드 성공.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add next.config.ts Dockerfile .dockerignore
@@ -1647,7 +1647,7 @@ git commit -m "build: Next.js standalone 빌드 + Dockerfile"
 - Delete: `open-next.config.ts`, `wrangler.jsonc`, `.open-next/`
 - Modify: `package.json` (스크립트·의존성)
 
-- [ ] **Step 1: Cloudflare 설정 파일 삭제**
+- [x] **Step 1: Cloudflare 설정 파일 삭제**
 
 ```bash
 git rm open-next.config.ts wrangler.jsonc
@@ -1656,12 +1656,12 @@ rm -rf .open-next
 
 (`​.open-next/` 는 이미 gitignore 되어 있어 `git rm` 불필요 — 로컬에서만 삭제.)
 
-- [ ] **Step 2: 의존성 제거**
+- [x] **Step 2: 의존성 제거**
 
 Run: `npm uninstall @opennextjs/cloudflare wrangler`
 Expected: `package.json` devDependencies 에서 두 패키지 제거.
 
-- [ ] **Step 3: package.json scripts 정리**
+- [x] **Step 3: package.json scripts 정리**
 
 `package.json` 의 `scripts` 블록을 다음으로 교체:
 
@@ -1678,12 +1678,12 @@ Expected: `package.json` devDependencies 에서 두 패키지 제거.
 
 (`preview`, `deploy`, `cf-typegen` 제거.)
 
-- [ ] **Step 4: 잔존 참조 확인 + 빌드**
+- [x] **Step 4: 잔존 참조 확인 + 빌드**
 
 Run: `grep -rn "opennext\|wrangler\|cloudflare" --include="*.ts" --include="*.tsx" --include="*.json" . --exclude-dir=node_modules --exclude-dir=docs && echo "---" && npm run build`
 Expected: `grep` 출력 없음 (`---` 만 보임), 빌드 성공.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add package.json package-lock.json open-next.config.ts wrangler.jsonc
@@ -1699,7 +1699,7 @@ git commit -m "chore: Cloudflare Workers 배포 잔재 제거"
 - Create: `.env.example`
 - Modify: `.gitignore`
 
-- [ ] **Step 1: .env.local 교체 (로컬 개발용, 커밋 안 됨)**
+- [x] **Step 1: .env.local 교체 (로컬 개발용, 커밋 안 됨)**
 
 `.env.local` 전체를 다음으로 교체:
 
@@ -1708,7 +1708,7 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/burn_emotion
 NEXT_PUBLIC_WS_URL=ws://localhost:8080
 ```
 
-- [ ] **Step 2: .env.example 작성 (커밋됨)**
+- [x] **Step 2: .env.example 작성 (커밋됨)**
 
 `.env.example`:
 
@@ -1722,7 +1722,7 @@ PORT=8080
 ALLOWED_ORIGIN=https://burn-emotion.net
 ```
 
-- [ ] **Step 3: .gitignore 에 .env.example 예외 추가**
+- [x] **Step 3: .gitignore 에 .env.example 예외 추가**
 
 `.gitignore` 에서 찾기:
 
@@ -1739,7 +1739,7 @@ ALLOWED_ORIGIN=https://burn-emotion.net
 !.env.example
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add .env.example .gitignore
