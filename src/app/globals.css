@@ -387,6 +387,12 @@ html, body {
   30%  { opacity: 1; }
   100% { opacity: 0; transform: translate(var(--sx), var(--sy)) rotate(var(--sr)); }
 }
+/* breakable 발판 재생 — RESPAWN_DELAY 뒤 다시 단단해질 때 materialize */
+@keyframes jumpPlatRespawn {
+  0%   { opacity: 0; transform: scale(0.7); }
+  60%  { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
 
 /* === Responsive trim === */
 @media (max-width: 820px) {

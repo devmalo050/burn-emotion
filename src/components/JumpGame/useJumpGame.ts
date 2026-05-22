@@ -5,9 +5,11 @@ import {
   type Platform,
   type PlatformKind,
   BREAK_DELAY,
+  RESPAWN_DELAY,
   SPRING_BOOST_MULT,
   ROLL_PUSH,
   ROLLING_WIDTH,
+  SWING_WIDTH,
   MAX_X_AMP,
   pickPlatformKind,
   initPlatformFields,
@@ -311,6 +313,21 @@ export function useJumpGame({ myNick }: Options): JumpGameApi {
         }
       }
 
+      // breakable 발판 수명 — 밟힌 지 BREAK_DELAY 지나면 부서져 통과 가능 상태가 되고
+      // 그 위 캐릭터는 낙하한다. 다시 RESPAWN_DELAY 만큼 지나면 단단하게 복구된다.
+      let breakableDirty = false;
+      for (const p of platformsRef.current) {
+        if (p.kind !== 'breakable' || p.breakAt == null) continue;
+        const since = now - p.breakAt;
+        if (since >= BREAK_DELAY + RESPAWN_DELAY) {
+          p.breakAt = null;
+          breakableDirty = true;
+        } else if (since >= BREAK_DELAY && standingPlatformRef.current === p) {
+          standingPlatformRef.current = null;
+          charOnGroundRef.current = false;
+        }
+      }
+
       // 중력 + 수직 이동 — 발판 위에 서 있을(onGround) 땐 중력 미적용.
       // 그래야 basic 은 제자리, 움직이는 발판은 동승 유지. 떨어지거나 점프 중일 때만
       // 중력을 받음. (서 있는데 중력으로 발판을 파고들면 lift 하강 시 재착지 판정이
@@ -325,6 +342,13 @@ export function useJumpGame({ myNick }: Options): JumpGameApi {
       let landed = false;
       if (charVyRef.current < 0) {
         for (const p of platformsRef.current) {
+          // 부서져 사라진 breakable 은 통과 — 착지 불가
+          if (
+            p.kind === 'breakable' &&
+            p.breakAt != null &&
+            now - p.breakAt >= BREAK_DELAY
+          )
+            continue;
           // 캐릭터가 발판 가로 범위 안
           if (charXRef.current < p.x - 4) continue;
           if (charXRef.current > p.x + p.width + 4) continue;
@@ -418,13 +442,15 @@ export function useJumpGame({ myNick }: Options): JumpGameApi {
         if (hotAdjacent) gap = Math.min(gap, 78);
         topY += gap;
         lastKind = kind;
-        // 발판 폭 — 후반엔 40~70 까지 좁아짐. 단 rolling 은 고정(밀려도 버틸 공간).
+        // 발판 폭 — 후반엔 40~70 까지 좁아짐. 단 rolling·swing 은 고정.
         const minW = 120 - difficulty * 80;
         const maxW = minW + 30;
         const w =
           kind === 'rolling'
             ? ROLLING_WIDTH
-            : minW + Math.random() * (maxW - minW);
+            : kind === 'swing'
+              ? SWING_WIDTH
+              : minW + Math.random() * (maxW - minW);
         const offsetRange = hotAdjacent ? 160 : 440;
         const offset = (Math.random() - 0.5) * offsetRange;
         // 움직이는 발판은 가로로 흔들리므로 화면 밖 안 나가게 여유를 둠.
@@ -445,15 +471,11 @@ export function useJumpGame({ myNick }: Options): JumpGameApi {
         dirty = true;
       }
 
-      // 발판 cleanup — 화면 아래로 떨어진 것 + 밟혀서 부서질 시간이 된 것 제거
+      // 발판 cleanup — 화면 아래로 떨어진 것 제거
       const cullBelow = cameraRelY - 100;
       for (let i = list.length - 1; i >= 0; i--) {
         const p = list[i];
-        const broken =
-          p.kind === 'breakable' &&
-          p.breakAt != null &&
-          now - p.breakAt > BREAK_DELAY;
-        if (p.y < cullBelow || broken) {
+        if (p.y < cullBelow) {
           if (standingPlatformRef.current === p) {
             standingPlatformRef.current = null;
             charOnGroundRef.current = false;
@@ -462,7 +484,7 @@ export function useJumpGame({ myNick }: Options): JumpGameApi {
           dirty = true;
         }
       }
-      if (dirty) setPlatforms([...list]);
+      if (dirty || breakableDirty) setPlatforms([...list]);
 
       // 죽음 판정 — 캐릭터 viewport 화면 아래로 한참 떨어짐
       const charBottomFromViewport =

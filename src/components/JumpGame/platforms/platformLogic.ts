@@ -1,6 +1,6 @@
 // 우주를 줄게 발판 종류 — 데이터 모델 + 스폰 분포 + 위치 갱신.
 // 새 발판 추가: 여기 KIND_SPAWN 항목 + PlatformDesigns 컴포넌트만 추가하면 됨.
-// 착지 시 효과(spring 부스트·hot 즉사·rolling 밀기·breakable 소멸)는 캐릭터 물리와
+// 착지 시 효과(spring 부스트·hot 즉사·rolling 밀기·breakable 부서짐·재생)는 캐릭터 물리와
 // 강결합이라 useJumpGame RAF 안에서 처리 — 여기 상수만 export.
 
 export type PlatformKind =
@@ -29,11 +29,14 @@ export interface Platform {
 }
 
 // === 동작 상수 ===
-export const BREAK_DELAY = 400; // breakable — 밟은 뒤 소멸까지 (ms)
+export const BREAK_DELAY = 400; // breakable — 밟은 뒤 부서지는 애니메이션 시간 (ms)
+export const RESPAWN_DELAY = 2500; // breakable — 부서진 뒤 다시 단단해질 때까지 (ms)
 export const SPRING_BOOST_MULT = 2; // spring — 일반 점프 초기속도 배수
 export const ROLL_PUSH = 0.12; // rolling — 캐릭터 미는 속도 (px/ms)
 // rolling 은 밀려도 버틸 공간이 필요해 너비 고정 (난이도에 따라 안 좁아짐).
 export const ROLLING_WIDTH = 130;
+// swing 은 진자라 난이도/랜덤으로 폭까지 흔들리면 어수선함 — 초기 크기로 고정.
+export const SWING_WIDTH = 120;
 
 // 움직이는 발판 사인파 — period 는 ms (now/period 가 sin 인자)
 const DRIFT_AMP = 70;

@@ -71,7 +71,9 @@ function Breakable({ width, breaking }: PlatProps) {
           background: 'linear-gradient(180deg, #8a8278 0%, #5a5048 50%, #2c2620 100%)',
           boxShadow:
             'inset 0 1px 0 rgba(255,250,240,0.35), inset 0 -3px 6px rgba(0,0,0,0.45), 0 4px 10px rgba(0,0,0,0.55)',
-          animation: breaking ? 'jumpPlatBreak 0.4s ease-in forwards' : undefined,
+          animation: breaking
+            ? 'jumpPlatBreak 0.4s ease-in forwards'
+            : 'jumpPlatRespawn 0.35s ease-out',
         }}
       >
         <div style={{ position: 'absolute', top: 4, left: '15%', width: '28%', height: 1, background: 'rgba(40,30,20,0.55)' }} />
