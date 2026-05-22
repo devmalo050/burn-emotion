@@ -599,12 +599,12 @@ git commit -m "feat(db): 리더보드·카운터 SQL 스키마를 db/ 로 정리
 - Create: `src/lib/db.ts`
 - Modify: `package.json` (dependencies)
 
-- [ ] **Step 1: `pg` 의존성 설치**
+- [x] **Step 1: `pg` 의존성 설치**
 
 Run: `npm install pg && npm install -D @types/pg`
 Expected: `package.json` dependencies 에 `pg`, devDependencies 에 `@types/pg` 추가.
 
-- [ ] **Step 2: `src/lib/db.ts` 작성**
+- [x] **Step 2: `src/lib/db.ts` 작성**
 
 ```ts
 import { Pool } from 'pg';
@@ -624,12 +624,12 @@ if (process.env.NODE_ENV !== 'production') {
 }
 ```
 
-- [ ] **Step 3: 타입 체크**
+- [x] **Step 3: 타입 체크**
 
 Run: `npx tsc --noEmit`
 Expected: 에러 없음.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/lib/db.ts package.json package-lock.json
@@ -652,7 +652,7 @@ Postgres `numeric` 은 `pg` 가 문자열로 반환하므로, 쿼리에서 `::fl
 - Create: `src/app/api/leaderboard/jump/route.ts`
 - Create: `src/app/api/counter/route.ts`
 
-- [ ] **Step 1: 별똥별 리더보드 Route Handler**
+- [x] **Step 1: 별똥별 리더보드 Route Handler**
 
 `src/app/api/leaderboard/meteor/route.ts`:
 
@@ -689,7 +689,7 @@ export async function POST(req: Request) {
 }
 ```
 
-- [ ] **Step 2: 점프 리더보드 Route Handler**
+- [x] **Step 2: 점프 리더보드 Route Handler**
 
 `src/app/api/leaderboard/jump/route.ts`:
 
@@ -726,7 +726,7 @@ export async function POST(req: Request) {
 }
 ```
 
-- [ ] **Step 3: 카운터 Route Handler**
+- [x] **Step 3: 카운터 Route Handler**
 
 `src/app/api/counter/route.ts`:
 
@@ -748,12 +748,12 @@ export async function POST() {
 }
 ```
 
-- [ ] **Step 4: 타입 체크**
+- [x] **Step 4: 타입 체크**
 
 Run: `npx tsc --noEmit`
 Expected: 에러 없음.
 
-- [ ] **Step 5: 로컬 동작 검증**
+- [x] **Step 5: 로컬 동작 검증**
 
 Task 4 의 `be-pg` 컨테이너가 떠 있어야 함. `.env.local` 에 임시로
 `DATABASE_URL=postgres://postgres:postgres@localhost:5432/burn_emotion` 를 둔 상태로:
@@ -774,7 +774,7 @@ curl -s -X POST localhost:3000/api/counter
 Expected: 각각 JSON 배열/`{"n":숫자}` 응답. `seconds` 가 문자열이 아니라 숫자로 옴.
 검증 후 `npm run dev` 종료.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/app/api/
