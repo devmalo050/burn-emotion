@@ -4,14 +4,16 @@ import { WebSocket } from 'ws';
 import { createRealtimeServer } from './server.js';
 
 function connect(port) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const ws = new WebSocket(`ws://127.0.0.1:${port}/?sid=${Math.random()}`);
     ws.on('open', () => resolve(ws));
+    ws.on('error', reject);
   });
 }
 
 function nextMessage(ws, type) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
+    ws.on('error', reject);
     ws.on('message', function handler(raw) {
       const m = JSON.parse(raw.toString());
       if (!type || m.t === type) {
@@ -78,5 +80,19 @@ test('연결이 끊기면 presence 에서 제거된다', async () => {
   assert.equal(metas.some((m) => m.nick === 'A'), false);
 
   b.close();
+  await server.close();
+});
+
+test('신규 접속자는 연결 즉시 presence 스냅샷을 받는다', async () => {
+  const server = await createRealtimeServer({ port: 0, allowedOrigin: '' });
+  const ws = new WebSocket(`ws://127.0.0.1:${server.port}/?sid=x`);
+  const first = await new Promise((resolve, reject) => {
+    ws.on('message', (raw) => resolve(JSON.parse(raw.toString())));
+    ws.on('error', reject);
+  });
+  assert.equal(first.t, 'presence');
+  assert.ok(first.state && typeof first.state === 'object');
+
+  ws.close();
   await server.close();
 });

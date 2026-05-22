@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { pathToFileURL } from 'node:url';
 import { WebSocketServer } from 'ws';
 
 const PORT = Number(process.env.PORT) || 8080;
@@ -110,7 +111,7 @@ export function createRealtimeServer({ port = PORT, allowedOrigin = ALLOWED_ORIG
 }
 
 // 직접 실행 시 기동
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   createRealtimeServer().then((s) => {
     console.log(`realtime server listening on :${s.port}`);
   });
