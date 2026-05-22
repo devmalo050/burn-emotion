@@ -6,8 +6,13 @@ import { createRealtimeServer } from './server.js';
 function connect(port) {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(`ws://127.0.0.1:${port}/?sid=${Math.random()}`);
-    ws.on('open', () => resolve(ws));
     ws.on('error', reject);
+    // open 이전에 message 핸들러를 달아 초기 presence 스냅샷을 소비한다.
+    // open 후에 달면 서버가 이미 전송한 메시지를 놓칠 수 있다.
+    ws.once('message', (raw) => {
+      const m = JSON.parse(raw.toString());
+      if (m.t === 'presence') resolve(ws);
+    });
   });
 }
 
