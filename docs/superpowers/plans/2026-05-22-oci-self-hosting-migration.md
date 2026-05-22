@@ -394,7 +394,7 @@ git commit -m "build(realtime): WS 서버 Dockerfile"
 - Create: `db/counter.sql`
 - Delete: `supabase/meteor_leaderboard.sql`, `supabase/jump_leaderboard.sql`
 
-- [ ] **Step 1: `db/meteor.sql` 작성**
+- [x] **Step 1: `db/meteor.sql` 작성**
 
 ```sql
 -- 별똥별 피하기 — 글로벌 TOP 10 리더보드. psql 로 통째 실행 (재실행 안전).
@@ -454,7 +454,7 @@ as $$
 $$;
 ```
 
-- [ ] **Step 2: `db/jump.sql` 작성**
+- [x] **Step 2: `db/jump.sql` 작성**
 
 ```sql
 -- 우주를 줄게(점프맵) — 글로벌 TOP 10 리더보드. psql 로 통째 실행 (재실행 안전).
@@ -513,7 +513,7 @@ as $$
 $$;
 ```
 
-- [ ] **Step 3: `db/counter.sql` 작성**
+- [x] **Step 3: `db/counter.sql` 작성**
 
 ```sql
 -- 오늘 구워진 고구마 카운터. psql 로 통째 실행 (재실행 안전).
@@ -558,7 +558,7 @@ end;
 $$;
 ```
 
-- [ ] **Step 4: 옛 supabase SQL 제거**
+- [x] **Step 4: 옛 supabase SQL 제거**
 
 ```bash
 git rm supabase/meteor_leaderboard.sql supabase/jump_leaderboard.sql
@@ -566,7 +566,7 @@ git rm supabase/meteor_leaderboard.sql supabase/jump_leaderboard.sql
 
 Expected: `supabase/` 디렉터리가 비면 자동 삭제됨.
 
-- [ ] **Step 5: 로컬 Postgres 로 검증**
+- [x] **Step 5: 로컬 Postgres 로 검증**
 
 로컬 Postgres 컨테이너 기동 후 SQL 적용:
 
@@ -582,7 +582,7 @@ docker exec -i be-pg psql -U postgres -d burn_emotion -c "select start_today(); 
 
 Expected: 함수 호출이 에러 없이 결과 행을 반환. 컨테이너 `be-pg` 는 다음 Task 검증에 계속 쓰므로 종료하지 말 것.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add db/ supabase/
