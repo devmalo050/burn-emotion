@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getSupabase, isSupabaseConfigured } from '@/lib/supabase/client';
+import { api } from '@/lib/api';
 import {
   type Platform,
   type PlatformKind,
@@ -178,13 +178,10 @@ export function useJumpGame({ myNick }: Options): JumpGameApi {
     if (gameState !== 'idle') return;
     setLastScoreHeight(null);
     setLeaderboardOpen(true);
-    if (!isSupabaseConfigured()) return;
-    const supabase = getSupabase();
-    if (!supabase) return;
-    void supabase.rpc('get_jump_top10').then(({ data, error }) => {
-      if (error || !Array.isArray(data)) return;
-      setLeaderboard(data as LeaderEntry[]);
-    });
+    void api
+      .jumpTop10()
+      .then(setLeaderboard)
+      .catch(() => {});
   }, [gameState]);
 
   const close = useCallback(() => {
@@ -197,14 +194,13 @@ export function useJumpGame({ myNick }: Options): JumpGameApi {
 
   // mount 시 TOP10 fetch
   useEffect(() => {
-    if (!isSupabaseConfigured()) return;
-    const supabase = getSupabase();
-    if (!supabase) return;
     let cancelled = false;
-    void supabase.rpc('get_jump_top10').then(({ data, error }) => {
-      if (cancelled || error || !Array.isArray(data)) return;
-      setLeaderboard(data as LeaderEntry[]);
-    });
+    void api
+      .jumpTop10()
+      .then((d) => {
+        if (!cancelled) setLeaderboard(d);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -515,22 +511,19 @@ export function useJumpGame({ myNick }: Options): JumpGameApi {
     if (gameState !== 'gameover') return;
     let cancelled = false;
     const h = lastScoreHeight ?? 0;
-    const supabase = getSupabase();
-    if (supabase) {
-      void supabase
-        .rpc('submit_jump_record', { p_nick: myNick, p_height: Number(h.toFixed(2)) })
-        .then(({ data, error }) => {
-          if (cancelled) return;
-          if (error || !Array.isArray(data)) {
-            void supabase.rpc('get_jump_top10').then(({ data: d2 }) => {
-              if (cancelled || !Array.isArray(d2)) return;
-              setLeaderboard(d2 as LeaderEntry[]);
-            });
-            return;
-          }
-          setLeaderboard(data as LeaderEntry[]);
-        });
-    }
+    void api
+      .submitJump(myNick, Number(h.toFixed(2)))
+      .then((d) => {
+        if (!cancelled) setLeaderboard(d);
+      })
+      .catch(() => {
+        void api
+          .jumpTop10()
+          .then((d2) => {
+            if (!cancelled) setLeaderboard(d2);
+          })
+          .catch(() => {});
+      });
     return () => {
       cancelled = true;
     };
