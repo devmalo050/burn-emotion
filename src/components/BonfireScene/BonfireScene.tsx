@@ -123,6 +123,15 @@ export function BonfireScene() {
     jumping: false,
     keys: new Set<string>(),
   });
+  // 다른 접속자들의 motion (broadcast 수신) — RAF 에서 lerp 로 보간해 60fps 부드럽게.
+  // state 안 쓰고 ref + DOM 직접 조작 → React 리렌더 비용 없음.
+  type PeerMotion = { dx: number; dy: number; yJump: number };
+  const peerTargetRef = useRef<Map<string, PeerMotion>>(new Map()); // 네트워크 도착값
+  const peerRenderRef = useRef<Map<string, PeerMotion>>(new Map()); // 현재 화면값 (lerp)
+  const peerElsRef = useRef<Map<string, HTMLDivElement>>(new Map()); // silhouette DOM
+  const peerFlipRef = useRef<Map<string, boolean>>(new Map()); // flip flag 캐시
+  // 내 motion 의 직전 송신값 — 변화 없으면 송신 안 함(가만 있을 때 트래픽 0).
+  const lastSentMotionRef = useRef<PeerMotion | null>(null);
 
   // 하늘의 별 데이터 — StarrySky 표시용.
   const skyStars = useMemo(() => makeStars(180), []);
@@ -138,6 +147,8 @@ export function BonfireScene() {
   // 머리 위 불꽃 이스터에그 — 캐릭터가 모닥불 통과 시 5초 지속
   const [headFire, setHeadFire] = useState<{ rainbow: boolean } | null>(null);
   const headFireTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 다른 접속자들의 머리 불 — broadcast 수신. on/off 가 5초 단위라 state 로 충분.
+  const [peerHeadFires, setPeerHeadFires] = useState<Record<string, { rainbow: boolean }>>({});
   // 도배 방지용 — 마지막 보낸 메시지 텍스트와 시각, 직전 N초 내 보낸 횟수
   const lastSentRef = useRef<{ text: string; at: number; recent: number[] }>({
     text: '',
@@ -323,6 +334,28 @@ export function BonfireScene() {
       setOnlineCount(newSilhouettes.length || 1);
       const myIdx = newSilhouettes.findIndex((s) => s.nick === myNick);
       setMySilhouetteIdx(myIdx >= 0 ? myIdx : null);
+      // peer motion ref 정리 + flip 캐시 갱신 (RAF 가 이걸 읽어 transform 합성)
+      const valid = new Set(newSilhouettes.map((s) => s.nick));
+      for (const nick of peerTargetRef.current.keys()) {
+        if (!valid.has(nick)) peerTargetRef.current.delete(nick);
+      }
+      for (const nick of peerRenderRef.current.keys()) {
+        if (!valid.has(nick)) peerRenderRef.current.delete(nick);
+      }
+      peerFlipRef.current.clear();
+      for (const s of newSilhouettes) {
+        if (s.nick !== myNick) peerFlipRef.current.set(s.nick, s.flip);
+      }
+      // 떠난 사람의 headFire 도 정리.
+      setPeerHeadFires((prev) => {
+        let changed = false;
+        const next: typeof prev = {};
+        for (const [nick, h] of Object.entries(prev)) {
+          if (valid.has(nick)) next[nick] = h;
+          else changed = true;
+        }
+        return changed ? next : prev;
+      });
     };
 
     const client = connectRealtime(sessionIdRef.current ?? myNick, {
@@ -341,6 +374,35 @@ export function BonfireScene() {
               ? data.count
               : parseInt(String(data?.count ?? ''), 10);
           if (!isNaN(n)) setTotalBurned((prev) => Math.max(prev, n));
+        } else if (event === 'motion') {
+          const data = payload as {
+            nick: string;
+            dx: number;
+            dy: number;
+            yJump: number;
+          };
+          if (!data?.nick || data.nick === myNick) return;
+          peerTargetRef.current.set(data.nick, {
+            dx: data.dx,
+            dy: data.dy,
+            yJump: data.yJump,
+          });
+        } else if (event === 'headfire') {
+          const data = payload as {
+            nick: string;
+            active: boolean;
+            rainbow: boolean;
+          };
+          if (!data?.nick || data.nick === myNick) return;
+          setPeerHeadFires((prev) => {
+            if (data.active) {
+              return { ...prev, [data.nick]: { rainbow: data.rainbow } };
+            }
+            if (!(data.nick in prev)) return prev;
+            const next = { ...prev };
+            delete next[data.nick];
+            return next;
+          });
         }
       },
       onPresence: applyPeers,
@@ -368,6 +430,63 @@ export function BonfireScene() {
       client.close();
     };
   }, [myNick, pushMessageFromCrowd]);
+
+  // === 본인 motion 20Hz broadcast — 변화 없으면 송신 안 함. 보간 없이 즉시 적용해 지연 최소화. ===
+  useEffect(() => {
+    if (!isRealtimeConfigured()) return;
+    const id = setInterval(() => {
+      const client = realtimeRef.current;
+      if (!client) return;
+      const m = motionRef.current;
+      const last = lastSentMotionRef.current;
+      if (
+        last &&
+        Math.abs(last.dx - m.dx) < 0.1 &&
+        Math.abs(last.dy - m.dy) < 0.1 &&
+        Math.abs(last.yJump - m.yJump) < 0.1
+      ) {
+        return;
+      }
+      client.send('motion', {
+        nick: myNick,
+        dx: m.dx,
+        dy: m.dy,
+        yJump: m.yJump,
+      });
+      lastSentMotionRef.current = { dx: m.dx, dy: m.dy, yJump: m.yJump };
+    }, 16);
+    return () => clearInterval(id);
+  }, [myNick]);
+
+  // === 다른 사람 motion RAF lerp — 60fps 로 target 으로 빠르게 따라감.
+  // factor 0.5 → 한 프레임에 절반 따라잡음(~2 프레임이면 거의 도달). 지연·끊김 둘 다 없음. ===
+  useEffect(() => {
+    let raf = 0;
+    const step = () => {
+      const tgts = peerTargetRef.current;
+      const rends = peerRenderRef.current;
+      const els = peerElsRef.current;
+      const flips = peerFlipRef.current;
+      for (const [nick, t] of tgts) {
+        const c = rends.get(nick) ?? { dx: 0, dy: 0, yJump: 0 };
+        const n: PeerMotion = {
+          dx: c.dx + (t.dx - c.dx) * 0.5,
+          dy: c.dy + (t.dy - c.dy) * 0.5,
+          yJump: c.yJump + (t.yJump - c.yJump) * 0.5,
+        };
+        rends.set(nick, n);
+        const el = els.get(nick);
+        if (el) {
+          const flipPart = flips.get(nick) ? 'scaleX(-1)' : '';
+          const yOff = -(n.dy + n.yJump);
+          el.style.transform = `translate(${n.dx.toFixed(1)}px, ${yOff.toFixed(1)}px) ${flipPart}`;
+        }
+      }
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   // === 오늘 구워진 고구마 카운터 — 마운트 시 fetch만, 갱신은 campfire-room broadcast로 ===
   useEffect(() => {
@@ -669,8 +788,20 @@ export function BonfireScene() {
           // splash 활성 중이면 무지개. 아니면 일반 주황.
           const rainbow = splashUntilRef.current > performance.now();
           setHeadFire({ rainbow });
+          realtimeRef.current?.send('headfire', {
+            nick: myNick,
+            active: true,
+            rainbow,
+          });
           if (headFireTimerRef.current) clearTimeout(headFireTimerRef.current);
-          headFireTimerRef.current = setTimeout(() => setHeadFire(null), 5000);
+          headFireTimerRef.current = setTimeout(() => {
+            setHeadFire(null);
+            realtimeRef.current?.send('headfire', {
+              nick: myNick,
+              active: false,
+              rainbow: false,
+            });
+          }, 5000);
         } else if (!inZone) {
           inBonfireZoneRef.current = false;
         }
@@ -879,7 +1010,8 @@ export function BonfireScene() {
           const isMine = i === mySilhouetteIdx;
           // 점프 게임 active 시 본인 silhouette 은 숨김 — 점프맵 캐릭터가 그 자리에서 시작.
           if (isMine && jump.gameState !== 'idle') return null;
-          // 본인은 flip 무시 (정면 유지) — translate 와 scaleX 합성 시 좌우 부호 헷갈림 제거.
+          // 본인은 flip 무시 (정면 유지). 다른 사람 transform 은 RAF lerp 가 매 프레임 DOM 에
+          // 직접 세팅 (peerElsRef 에 등록). 첫 렌더 동안은 flip 만 잡아두고, RAF 가 곧 덮어씀.
           const otherTransform = s.flip ? 'scaleX(-1)' : 'none';
           // === 모닥불 깊이 처리 ===
           // silhouettes container bottom 180 + spot.y = silhouette base viewport bottom.
@@ -892,16 +1024,25 @@ export function BonfireScene() {
           return (
             <div
               key={s.id}
-              ref={isMine ? myCharRef : undefined}
+              ref={(el) => {
+                if (isMine) {
+                  myCharRef.current = el;
+                } else if (el) {
+                  peerElsRef.current.set(s.nick, el);
+                } else {
+                  peerElsRef.current.delete(s.nick);
+                }
+              }}
               className={styles.silhouette}
               style={{
                 left: `calc(${s.x}% - 40px)`,
                 bottom: s.y + 'px',
+                zIndex: staticDepthZ,
                 // 본인은 transform key 자체를 안 줌 — ref 가 매 프레임 직접 갱신.
-                // 다른 사람은 React 가 flip 만 set.
+                // 다른 사람도 RAF lerp 가 직접 갱신 — 초기 flip 만 인라인으로 잡아둠.
                 ...(isMine
-                  ? { zIndex: staticDepthZ, transition: 'none' }
-                  : { transform: otherTransform, zIndex: staticDepthZ }),
+                  ? { transition: 'none' }
+                  : { transform: otherTransform }),
               }}
             >
               <div
@@ -923,6 +1064,9 @@ export function BonfireScene() {
                 }
               >
                 {isMine && headFire && <HeadFire rainbow={headFire.rainbow} />}
+                {!isMine && peerHeadFires[s.nick] && (
+                  <HeadFire rainbow={peerHeadFires[s.nick].rainbow} />
+                )}
                 <PersonSilhouette variant={s.variant} scale={s.scale} />
               </div>
               {activeBubbles[i] && (
