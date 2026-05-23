@@ -19,8 +19,12 @@ import { makeNickname } from '@/lib/nickname';
 import { PLACEHOLDER_LINES } from '@/lib/data/placeholder-lines';
 import { COMFORT_LINES, type ComfortLine } from '@/lib/data/comfort-lines';
 import { AudioEngine } from '@/lib/audio/audio-engine';
-import { getSupabase, isSupabaseConfigured } from '@/lib/supabase/client';
-import type { RealtimeChannel } from '@supabase/supabase-js';
+import {
+  connectRealtime,
+  isRealtimeConfigured,
+  type RealtimeClient,
+} from '@/lib/realtime/client';
+import { api } from '@/lib/api';
 import type {
   ChatMessage,
   PotatoState,
@@ -147,8 +151,8 @@ export function BonfireScene() {
   // 다른 사람이 보낸 메시지로 spawn된 고구마는 여기 안 들어가서 우리가 카운트 안 함
   // (그쪽 sender가 카운트). 결과적으로 메시지 1개당 정확히 1번 카운트.
   const myPotatoIdsRef = useRef<Set<number>>(new Set());
-  // 실시간 채널 (broadcast + presence)
-  const channelRef = useRef<RealtimeChannel | null>(null);
+  // 실시간 클라이언트 (broadcast + presence)
+  const realtimeRef = useRef<RealtimeClient | null>(null);
   // setSilhouettes updater 안에서 부작용 호출 시 StrictMode가 두 번 호출하는 문제 방지용
   const silhouettesRef = useRef<SilhouetteEntity[]>([]);
   // presence key — tab/session 별로 고유. 닉네임을 키로 쓰면 새로고침 시 옛 닉이
@@ -283,17 +287,10 @@ export function BonfireScene() {
     document.fonts.load('400 14px Pretendard').catch(() => {});
   }, []);
 
-  // === Supabase Realtime: broadcast (메시지) + presence (접속자/실루엣) ===
-  // 실제 멀티유저 모드일 때만. presence가 silhouettes 의 source of truth.
+  // === 실시간: broadcast (메시지) + presence (접속자/실루엣) ===
+  // presence 가 silhouettes 의 source of truth.
   useEffect(() => {
-    if (!isSupabaseConfigured()) return;
-    const supabase = getSupabase();
-    if (!supabase || !mySpotRef.current) return;
-
-    const channel = supabase.channel('campfire-room', {
-      config: { presence: { key: sessionIdRef.current ?? myNick } },
-    });
-    channelRef.current = channel;
+    if (!isRealtimeConfigured() || !mySpotRef.current) return;
 
     type PresenceMeta = {
       nick: string;
@@ -305,16 +302,10 @@ export function BonfireScene() {
       joinedAt: number;
     };
 
-    // presence sync 받을 때마다 silhouettes 재계산.
-    // heartbeat/stale filter는 안 씀 — background tab throttling로 false positive 발생함.
-    // Supabase 기본 disconnect 감지(WebSocket 끊김)에 맡김.
-    const applyPeers = () => {
-      const state = channel.presenceState<PresenceMeta>();
+    const applyPeers = (state: Record<string, unknown>) => {
       const peerList: PresenceMeta[] = [];
       for (const key in state) {
-        const arr = state[key];
-        if (!arr || arr.length === 0) continue;
-        const meta = arr[0];
+        const meta = state[key] as PresenceMeta | undefined;
         if (!meta?.nick) continue;
         peerList.push(meta);
       }
@@ -334,66 +325,60 @@ export function BonfireScene() {
       setMySilhouetteIdx(myIdx >= 0 ? myIdx : null);
     };
 
-    channel
-      .on('broadcast', { event: 'msg' }, (payload) => {
-        const data = payload.payload as { nick: string; text: string };
-        if (!data?.nick || !data?.text) return;
-        if (data.nick === myNick) return;
-        const sList = silhouettesRef.current;
-        const sIdx = sList.findIndex((s) => s.nick === data.nick);
-        pushMessageFromCrowd({ text: data.text, nick: data.nick, sIdx });
-      })
-      .on('broadcast', { event: 'counter' }, (payload) => {
-        const data = payload.payload as { count: number | string };
-        const n =
-          typeof data?.count === 'number' ? data.count : parseInt(String(data?.count ?? ''), 10);
-        if (!isNaN(n)) setTotalBurned((prev) => Math.max(prev, n));
-      })
-      .on('presence', { event: 'join' }, applyPeers)
-      .on('presence', { event: 'leave' }, applyPeers)
-      .on('presence', { event: 'sync' }, applyPeers)
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED' && mySpotRef.current) {
-          await channel.track({
-            nick: myNick,
-            x: mySpotRef.current.x,
-            y: mySpotRef.current.y,
-            scale: mySpotRef.current.scale,
-            flip: mySpotRef.current.flip,
-            variant: mySpotRef.current.variant,
-            joinedAt: mySpotRef.current.joinedAt,
-          });
+    const client = connectRealtime(sessionIdRef.current ?? myNick, {
+      onBroadcast: (event, payload) => {
+        if (event === 'msg') {
+          const data = payload as { nick: string; text: string };
+          if (!data?.nick || !data?.text) return;
+          if (data.nick === myNick) return;
+          const sList = silhouettesRef.current;
+          const sIdx = sList.findIndex((s) => s.nick === data.nick);
+          pushMessageFromCrowd({ text: data.text, nick: data.nick, sIdx });
+        } else if (event === 'counter') {
+          const data = payload as { count: number | string };
+          const n =
+            typeof data?.count === 'number'
+              ? data.count
+              : parseInt(String(data?.count ?? ''), 10);
+          if (!isNaN(n)) setTotalBurned((prev) => Math.max(prev, n));
         }
-      });
+      },
+      onPresence: applyPeers,
+    });
+    if (!client) return;
+    realtimeRef.current = client;
+    client.track({
+      nick: myNick,
+      x: mySpotRef.current.x,
+      y: mySpotRef.current.y,
+      scale: mySpotRef.current.scale,
+      flip: mySpotRef.current.flip,
+      variant: mySpotRef.current.variant,
+      joinedAt: mySpotRef.current.joinedAt,
+    });
 
-    // pagehide/beforeunload — fire되면 즉시 정리. 못 받는 브라우저는 server timeout 의존.
-    const onLeave = () => {
-      void channel.untrack();
-      void supabase.removeChannel(channel);
-    };
+    const onLeave = () => client.close();
     window.addEventListener('pagehide', onLeave);
     window.addEventListener('beforeunload', onLeave);
 
     return () => {
       window.removeEventListener('pagehide', onLeave);
       window.removeEventListener('beforeunload', onLeave);
-      channelRef.current = null;
-      void supabase.removeChannel(channel);
+      realtimeRef.current = null;
+      client.close();
     };
   }, [myNick, pushMessageFromCrowd]);
 
   // === 오늘 구워진 고구마 카운터 — 마운트 시 fetch만, 갱신은 campfire-room broadcast로 ===
   useEffect(() => {
-    if (!isSupabaseConfigured()) return;
-    const supabase = getSupabase();
-    if (!supabase) return;
+    if (!isRealtimeConfigured()) return;
     let cancelled = false;
-    void supabase.rpc('start_today').then(({ data, error }) => {
-      if (cancelled || error) return;
-      const n =
-        typeof data === 'number' ? data : parseInt(String(data ?? ''), 10);
-      if (!isNaN(n)) setTotalBurned(n);
-    });
+    void api
+      .counterToday()
+      .then((n) => {
+        if (!cancelled && !isNaN(n)) setTotalBurned(n);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -412,23 +397,16 @@ export function BonfireScene() {
     }
     if (disappearedMine.length === 0) return;
     for (const id of disappearedMine) myPotatoIdsRef.current.delete(id);
-    const supabase = getSupabase();
-    if (!supabase) return;
+    if (!isRealtimeConfigured()) return;
     for (const _ of disappearedMine) {
-      void supabase.rpc('inc_burned').then(({ data, error }) => {
-        if (error) return;
-        const n =
-          typeof data === 'number' ? data : parseInt(String(data ?? ''), 10);
-        if (isNaN(n)) return;
-        setTotalBurned((prev) => Math.max(prev, n));
-        if (channelRef.current) {
-          void channelRef.current.send({
-            type: 'broadcast',
-            event: 'counter',
-            payload: { count: n },
-          });
-        }
-      });
+      void api
+        .incBurned()
+        .then((n) => {
+          if (isNaN(n)) return;
+          setTotalBurned((prev) => Math.max(prev, n));
+          realtimeRef.current?.send('counter', { count: n });
+        })
+        .catch(() => {});
     }
     // pile 자체가 아니라 pileIdsKey로 dep 잡아 roast 진행 frame엔 무시
     // (length만 보면 evict+spawn 동시 발생 시 missed)
@@ -792,14 +770,8 @@ export function BonfireScene() {
         }, 3000);
       }
       setFeedMessages((prev) => [{ ...msg, nick: msg.nick + ' (나)' }, ...prev].slice(0, 7));
-      // 다른 접속자들에게 broadcast (Supabase 채널 연결되어 있을 때만)
-      if (channelRef.current) {
-        void channelRef.current.send({
-          type: 'broadcast',
-          event: 'msg',
-          payload: { nick: myNick, text },
-        });
-      }
+      // 다른 접속자들에게 broadcast (WS 연결되어 있을 때만)
+      realtimeRef.current?.send('msg', { nick: myNick, text });
       setTimeout(() => spawnPotatoAtFire(msg), 100);
       setTimeout(() => {
         setFeedMessages((prev) => prev.map((x) => (x.id === id ? { ...x, fading: true } : x)));

@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { getSupabase, isSupabaseConfigured } from '@/lib/supabase/client';
+import { api } from '@/lib/api';
 
 export type MeteorGameState = 'idle' | 'countdown' | 'playing' | 'gameover';
 
@@ -84,13 +84,10 @@ export function useMeteorGame(opts: Options): MeteorGameApi {
     if (gameState !== 'idle') return;
     setLastScoreSec(null);
     setLeaderboardOpen(true);
-    if (!isSupabaseConfigured()) return;
-    const supabase = getSupabase();
-    if (!supabase) return;
-    void supabase.rpc('get_meteor_top10').then(({ data, error }) => {
-      if (error || !Array.isArray(data)) return;
-      setLeaderboard(data as LeaderEntry[]);
-    });
+    void api
+      .meteorTop10()
+      .then(setLeaderboard)
+      .catch(() => {});
   }, [gameState]);
 
   // === 모달 닫기 ===
@@ -105,14 +102,13 @@ export function useMeteorGame(opts: Options): MeteorGameApi {
 
   // === 마운트 시 TOP10 fetch ===
   useEffect(() => {
-    if (!isSupabaseConfigured()) return;
-    const supabase = getSupabase();
-    if (!supabase) return;
     let cancelled = false;
-    void supabase.rpc('get_meteor_top10').then(({ data, error }) => {
-      if (cancelled || error || !Array.isArray(data)) return;
-      setLeaderboard(data as LeaderEntry[]);
-    });
+    void api
+      .meteorTop10()
+      .then((d) => {
+        if (!cancelled) setLeaderboard(d);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -263,22 +259,19 @@ export function useMeteorGame(opts: Options): MeteorGameApi {
     if (gameState !== 'gameover') return;
     let cancelled = false;
     const sec = lastScoreSec ?? 0;
-    const supabase = getSupabase();
-    if (supabase) {
-      void supabase
-        .rpc('submit_meteor_record', { p_nick: myNick, p_seconds: Number(sec.toFixed(2)) })
-        .then(({ data, error }) => {
-          if (cancelled) return;
-          if (error || !Array.isArray(data)) {
-            void supabase.rpc('get_meteor_top10').then(({ data: d2 }) => {
-              if (cancelled || !Array.isArray(d2)) return;
-              setLeaderboard(d2 as LeaderEntry[]);
-            });
-            return;
-          }
-          setLeaderboard(data as LeaderEntry[]);
-        });
-    }
+    void api
+      .submitMeteor(myNick, Number(sec.toFixed(2)))
+      .then((d) => {
+        if (!cancelled) setLeaderboard(d);
+      })
+      .catch(() => {
+        void api
+          .meteorTop10()
+          .then((d2) => {
+            if (!cancelled) setLeaderboard(d2);
+          })
+          .catch(() => {});
+      });
     return () => {
       cancelled = true;
     };
