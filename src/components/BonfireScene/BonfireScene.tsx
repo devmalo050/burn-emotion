@@ -49,6 +49,7 @@ const NPC_MESSAGES = [
   '오른쪽 위 달을 한 번 눌러보세요. 별똥별 피하기 게임이 시작돼요.',
   '달 옆에 큼직한 별 하나가 있어요. 누르면 별똥별 리더보드를 볼 수 있어요.',
   '왼쪽 위 열기구를 누르면 끝없이 올라가는 점프맵이 시작돼요.',
+  '열기구 옆 작은 구름을 누르면 점프맵 리더보드를 볼 수 있어요.',
   '모닥불을 한 번 눌러보세요. 불멍가루가 흩날리고, 직후 통과하면 머리에 무지개 불이 붙어요.',
   '메시지는 어디에도 저장되지 않아요. 마음 편히 한 마디 던지고 가세요.',
 ];
@@ -1209,6 +1210,26 @@ export function BonfireScene() {
           }}
           ariaLabel="우주를 줄게 시작"
         />
+      </div>
+
+      <div
+        onClick={jump.openLeaderboard}
+        role="button"
+        aria-label="우주를 줄게 리더보드 열기"
+        title="우주를 줄게 리더보드"
+        className={styles.leaderboardCloud}
+        style={{
+          position: 'absolute',
+          top: 'calc(12% - 8px)',
+          left: 'calc(12% + 36px)',
+          zIndex: 11,
+        }}
+      >
+        <svg width="44" height="26" viewBox="0 0 44 26">
+          <ellipse cx="12" cy="16" rx="11" ry="9" fill="#eef3f9" opacity="0.9" />
+          <ellipse cx="24" cy="12" rx="13" ry="11" fill="#eef3f9" opacity="0.9" />
+          <ellipse cx="34" cy="17" rx="9" ry="8" fill="#eef3f9" opacity="0.9" />
+        </svg>
       </div>
 
       {/* Bonfire zone — clicking it boosts roasting (easter egg) */}

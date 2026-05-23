@@ -284,6 +284,18 @@
   transform: translateX(-50%) rotate(45deg);
 }
 
+.leaderboardCloud {
+  cursor: pointer;
+  filter: drop-shadow(0 2px 6px rgba(255, 240, 210, 0.25));
+  transition: transform 0.18s ease, filter 0.18s ease;
+}
+.leaderboardCloud:hover {
+  transform: scale(1.18) translateY(-2px);
+  filter:
+    drop-shadow(0 2px 6px rgba(255, 240, 210, 0.45))
+    drop-shadow(0 0 10px rgba(255, 245, 220, 0.7));
+}
+
 /* === Fire glow === */
 .fireGlow {
   position: absolute;
