@@ -7,11 +7,11 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://burn-emotion.verce
 const webApplication = {
   '@context': 'https://schema.org',
   '@type': 'WebApplication',
-  name: '군고구마 굽기',
+  name: '군고구마 채팅',
   alternateName: 'Burn Emotion',
   url: SITE_URL,
   description:
-    '캠프파이어 옆에서 익명으로 털어놓는 한국어 채팅 서비스. 한 마디 던지면 군고구마가 익어가다 18초 후 사라집니다. 회원가입 없음, 메시지 비저장.',
+    '모닥불 옆에서 익명으로 털어놓는 한국어 채팅. 욕설 필터 없는 감정 쓰레기통. 채팅창 명령어로 작은 이스터에그 미니게임도 즐길 수 있습니다.',
   applicationCategory: 'LifestyleApplication',
   operatingSystem: 'Web',
   inLanguage: 'ko-KR',
@@ -28,6 +28,8 @@ const webApplication = {
     '실시간 다중 사용자',
     '캠프파이어 시각화',
     '하루 구워진 고구마 카운트',
+    '이스터에그 미니게임 (별똥별 피하기·우주를 줄게)',
+    '글로벌 TOP 10 리더보드',
   ],
 };
 
@@ -73,6 +75,14 @@ const faqPage = {
       acceptedAnswer: {
         '@type': 'Answer',
         text: '무료입니다. 광고도 없습니다.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: '숨겨진 미니게임은 뭔가요?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: '채팅창에 "/별똥별"을 입력하면 별똥별 피하기 생존 게임, "/우주를 줄게"를 입력하면 위로 끝없이 점프하는 점프맵이 시작됩니다. 각각 글로벌 TOP 10 리더보드가 있습니다.',
       },
     },
   ],

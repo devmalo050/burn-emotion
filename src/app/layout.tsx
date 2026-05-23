@@ -5,9 +5,9 @@ import './globals.css';
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://burn-emotion.vercel.app';
-const SITE_NAME = '군고구마 굽기';
+const SITE_NAME = '군고구마 채팅';
 const SITE_DESC =
-  '캠프파이어 옆에서 익명으로 털어놓는 한국어 채팅. 한 마디 보내면 모닥불 위 군고구마가 18초 동안 익다 갈라져 사라집니다. 회원가입·로그인·메시지 저장 없음. 욕설 필터 없는 감정 쓰레기통.';
+  '모닥불 옆에서 익명으로 털어놓는 채팅. 욕설 필터 없는 감정 쓰레기통. 작은 이스터에그 미니게임.';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -49,7 +49,7 @@ export const metadata: Metadata = {
         width: 1200,
         height: 630,
         type: 'image/png',
-        alt: '군고구마 굽기 · 모닥불 옆에서 익명으로 털어놓는 채팅',
+        alt: '군고구마 채팅 · 모닥불 옆에서 익명으로 털어놓는 채팅',
       },
     ],
   },

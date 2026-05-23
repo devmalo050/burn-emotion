@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
 
 export const runtime = 'edge';
-export const alt = '군고구마 굽기 · 모닥불 옆에서 익명으로 털어놓는 채팅';
+export const alt = '군고구마 채팅 · 모닥불 옆에서 익명으로 털어놓는 채팅';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -57,7 +57,7 @@ export default async function OpengraphImage() {
             display: 'flex',
           }}
         >
-          군고구마 굽기
+          군고구마 채팅
         </div>
 
         <div
