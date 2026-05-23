@@ -38,6 +38,21 @@ const CRACK_DURATION_MS = 2400;
 const POKE_BOOST = 0.18;
 const MAX_POTATOES = 7;
 
+// === NPC 모닥지기 — 이스터에그를 모르는 사람들을 위해 주기적 가이드. ===
+// 모든 클라이언트가 Date.now() 기반으로 같은 메시지를 같은 시점에 보임(서버 변경 없이 동기화).
+const NPC_NICK = '모닥지기';
+const NPC_SPOT = { x: 72, y: 10, variant: 3, scale: 0.6 } as const;
+const NPC_INTERVAL_MS = 60_000; // 메시지 간격
+const NPC_BUBBLE_VISIBLE_MS = 10_000; // 버블 표시 지속
+const NPC_MESSAGES = [
+  '방향키로 캐릭터를 움직일 수 있어요. 스페이스바를 누르면 점프해요.',
+  '오른쪽 위 달을 한 번 눌러보세요. 별똥별 피하기 게임이 시작돼요.',
+  '달 옆에 큼직한 별 하나가 있어요. 누르면 별똥별 리더보드를 볼 수 있어요.',
+  '왼쪽 위 열기구를 누르면 끝없이 올라가는 점프맵이 시작돼요.',
+  '모닥불을 한 번 눌러보세요. 불멍가루가 흩날리고, 직후 통과하면 머리에 무지개 불이 붙어요.',
+  '메시지는 어디에도 저장되지 않아요. 마음 편히 한 마디 던지고 가세요.',
+];
+
 // 별똥별 게임 카운트다운에서 보여주는 키보드 일러스트 스타일.
 const meteorKeyStyle: React.CSSProperties = {
   width: 36,
@@ -148,6 +163,8 @@ export function BonfireScene() {
   // 머리 위 불꽃 이스터에그 — 캐릭터가 모닥불 통과 시 5초 지속
   const [headFire, setHeadFire] = useState<{ rainbow: boolean } | null>(null);
   const headFireTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // NPC 모닥지기 가이드 버블 (시간 기반 로테이션)
+  const [npcBubble, setNpcBubble] = useState<{ text: string; key: number } | null>(null);
   // 다른 접속자들의 머리 불 — broadcast 수신. on/off 가 5초 단위라 state 로 충분.
   const [peerHeadFires, setPeerHeadFires] = useState<Record<string, { rainbow: boolean }>>({});
   // 도배 방지용 — 마지막 보낸 메시지 텍스트와 시각, 직전 N초 내 보낸 횟수
@@ -504,6 +521,31 @@ export function BonfireScene() {
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
+  }, []);
+
+  // === NPC 모닥지기 가이드 로테이션 — 첫 메시지는 10초 뒤, 이후 60초 경계에 맞춰 ===
+  // Math.floor(Date.now()/INTERVAL) 인덱스라 모든 클라이언트가 같은 메시지를 같은 시점에 봄.
+  useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const showCurrent = () => {
+      const idx = Math.floor(Date.now() / NPC_INTERVAL_MS) % NPC_MESSAGES.length;
+      setNpcBubble({ text: NPC_MESSAGES[idx], key: Date.now() });
+      timers.push(setTimeout(() => setNpcBubble(null), NPC_BUBBLE_VISIBLE_MS));
+    };
+    timers.push(
+      setTimeout(() => {
+        showCurrent();
+        const align = NPC_INTERVAL_MS - (Date.now() % NPC_INTERVAL_MS);
+        const loop = () => {
+          showCurrent();
+          timers.push(setTimeout(loop, NPC_INTERVAL_MS));
+        };
+        timers.push(setTimeout(loop, align));
+      }, 10_000),
+    );
+    return () => {
+      timers.forEach(clearTimeout);
+    };
   }, []);
 
   // === 오늘 구워진 고구마 카운터 — 마운트 시 fetch만, 갱신은 campfire-room broadcast로 ===
@@ -1026,6 +1068,38 @@ export function BonfireScene() {
 
       {/* Silhouettes — 토글로 숨길 수 있음 */}
       <div className={styles.silhouettes} style={{ opacity: showPeople ? 1 : 0, transition: 'opacity 0.4s ease' }}>
+        {/* NPC 모닥지기 — 이스터에그 가이드. presence/online count 에 포함되지 않는 고정 자리. */}
+        <div
+          className={styles.silhouette}
+          style={{
+            left: `calc(${NPC_SPOT.x}% - 40px)`,
+            bottom: NPC_SPOT.y + 'px',
+            zIndex: 25,
+          }}
+        >
+          <div
+            className={styles.silhouetteNick}
+            style={{
+              transform: 'translateX(-50%)',
+              color: '#ffb84d',
+              fontWeight: 600,
+            }}
+          >
+            {NPC_NICK}
+          </div>
+          <div style={{ filter: 'drop-shadow(0 0 6px rgba(255,184,77,0.4))' }}>
+            <PersonSilhouette variant={NPC_SPOT.variant} scale={NPC_SPOT.scale} />
+          </div>
+          {npcBubble && (
+            <div
+              className={styles.silhouetteBubble}
+              key={npcBubble.key}
+              style={{ transform: 'translateX(-50%)', width: 260, maxWidth: 'none' }}
+            >
+              {npcBubble.text}
+            </div>
+          )}
+        </div>
         {silhouettes.map((s, i) => {
           const isMine = i === mySilhouetteIdx;
           // 점프 게임 active 시 본인 silhouette 은 숨김 — 점프맵 캐릭터가 그 자리에서 시작.

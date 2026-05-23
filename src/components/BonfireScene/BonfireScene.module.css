@@ -258,11 +258,12 @@
   backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 140, 58, 0.16);
   border-radius: 7px;
-  padding: 4px 9px;
-  white-space: nowrap;
-  max-width: 170px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  padding: 5px 10px;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  max-width: 220px;
+  text-align: center;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
   pointer-events: none;
   animation: bubbleIn 0.5s cubic-bezier(0.16, 1, 0.3, 1),
