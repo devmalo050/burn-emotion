@@ -7,7 +7,7 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://burn-emotion.verce
 const webApplication = {
   '@context': 'https://schema.org',
   '@type': 'WebApplication',
-  name: '군고구마 채팅',
+  name: '불멍',
   alternateName: 'Burn Emotion',
   url: SITE_URL,
   description:

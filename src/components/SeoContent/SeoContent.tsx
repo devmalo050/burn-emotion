@@ -9,7 +9,7 @@ export function SeoContent() {
   return (
     <div className={styles.srOnly} aria-hidden="false">
       <header>
-        <h1>군고구마 채팅 · 모닥불 옆에서 익명으로 털어놓는 채팅</h1>
+        <h1>불멍 · 모닥불 옆에서 익명으로 털어놓는 채팅</h1>
         <p>
           오늘 하루 무겁게 들고 다닌 감정을, 모닥불 옆 자리에 앉아 한 마디 던져 보세요.
           말 한 마디가 군고구마 한 알이 되어 18초 동안 천천히 익어갑니다.

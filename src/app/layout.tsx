@@ -5,7 +5,7 @@ import './globals.css';
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://burn-emotion.vercel.app';
-const SITE_NAME = '군고구마 채팅';
+const SITE_NAME = '불멍';
 const SITE_DESC =
   '모닥불 옆에서 익명으로 털어놓는 채팅. 욕설 필터 없는 감정 쓰레기통. 작은 이스터에그 미니게임.';
 
@@ -49,7 +49,7 @@ export const metadata: Metadata = {
         width: 1200,
         height: 630,
         type: 'image/png',
-        alt: '군고구마 채팅 · 모닥불 옆에서 익명으로 털어놓는 채팅',
+        alt: '불멍 · 모닥불 옆에서 익명으로 털어놓는 채팅',
       },
     ],
   },
