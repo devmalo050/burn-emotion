@@ -123,14 +123,11 @@ export function BonfireScene() {
     jumping: false,
     keys: new Set<string>(),
   });
-  // 다른 접속자들의 motion (broadcast 수신) — RAF 에서 속도 외삽 + lerp 로 60fps 렌더.
-  // 외삽: 직전·현재 스냅샷 속도로 "지금쯤 여기 있겠지" 예측 → 네트워크 RTT 만큼 앞으로 당김.
-  // lerp: 방향 전환 때 외삽 target 이 튀어도 한두 프레임에 부드럽게 보정.
+  // 다른 접속자들의 motion (broadcast 수신) — RAF 에서 lerp 로 60fps 부드럽게.
+  // 외삽은 방향 전환 때 오버슈팅/스냅으로 부자연스러워서 안 씀. RTT 만큼 지연은 감수.
   type PeerMotion = { dx: number; dy: number; yJump: number };
-  type PeerSnapshot = PeerMotion & { t: number }; // t: 도착 시각(performance.now)
-  const peerTargetRef = useRef<Map<string, PeerSnapshot>>(new Map()); // 최신 도착
-  const peerPrevRef = useRef<Map<string, PeerSnapshot>>(new Map()); // 직전 도착(속도 계산용)
-  const peerRenderRef = useRef<Map<string, PeerMotion>>(new Map()); // 현재 화면값
+  const peerTargetRef = useRef<Map<string, PeerMotion>>(new Map()); // 네트워크 도착값
+  const peerRenderRef = useRef<Map<string, PeerMotion>>(new Map()); // 현재 화면값(lerp)
   const peerElsRef = useRef<Map<string, HTMLDivElement>>(new Map()); // silhouette DOM
   const peerFlipRef = useRef<Map<string, boolean>>(new Map()); // flip flag 캐시
   const peerSpotYRef = useRef<Map<string, number>>(new Map()); // spot.y 캐시 (z-index 계산용)
@@ -343,9 +340,6 @@ export function BonfireScene() {
       for (const nick of peerTargetRef.current.keys()) {
         if (!valid.has(nick)) peerTargetRef.current.delete(nick);
       }
-      for (const nick of peerPrevRef.current.keys()) {
-        if (!valid.has(nick)) peerPrevRef.current.delete(nick);
-      }
       for (const nick of peerRenderRef.current.keys()) {
         if (!valid.has(nick)) peerRenderRef.current.delete(nick);
       }
@@ -393,14 +387,19 @@ export function BonfireScene() {
             yJump: number;
           };
           if (!data?.nick || data.nick === myNick) return;
-          const cur = peerTargetRef.current.get(data.nick);
-          if (cur) peerPrevRef.current.set(data.nick, cur);
           peerTargetRef.current.set(data.nick, {
             dx: data.dx,
             dy: data.dy,
             yJump: data.yJump,
-            t: performance.now(),
           });
+        } else if (event === 'splash') {
+          // 다른 사람의 불멍가루 splash — 위치는 각자 화면 모닥불 중앙에 트리거.
+          const data = payload as { nick: string };
+          if (!data?.nick || data.nick === myNick) return;
+          campfireFlamesRef.current?.splash(
+            window.innerWidth / 2,
+            window.innerHeight * 0.6,
+          );
         } else if (event === 'headfire') {
           const data = payload as {
             nick: string;
@@ -472,44 +471,23 @@ export function BonfireScene() {
     return () => clearInterval(id);
   }, [myNick]);
 
-  // === 다른 사람 motion RAF — 속도 외삽(extrapolation) + 가벼운 lerp.
-  // 외삽: 직전·현재 스냅샷 속도(px/ms)로 (now - 도착시각) 만큼 앞으로 당겨 RTT 보정.
-  //       runaway 방지로 외삽 시간은 EXTRAP_CAP(200ms) 까지만.
-  // lerp factor 0.6: 외삽 target 이 방향전환 등으로 튀어도 1~2 프레임에 부드럽게 따라잡음. ===
+  // === 다른 사람 motion RAF lerp — 60fps 로 target 으로 빠르게 따라감.
+  // factor 0.5 → 한 프레임에 절반 따라잡음(~2 프레임이면 거의 도달). 끊김 없음.
+  // 외삽은 방향 전환 때 오버슈팅이 부자연스러워 안 씀 — RTT 만큼 지연은 감수. ===
   useEffect(() => {
     let raf = 0;
-    const EXTRAP_CAP = 200;
-    const FACTOR = 0.6;
+    const FACTOR = 0.5;
     const step = () => {
-      const now = performance.now();
       const tgts = peerTargetRef.current;
-      const prevs = peerPrevRef.current;
       const rends = peerRenderRef.current;
       const els = peerElsRef.current;
       const flips = peerFlipRef.current;
-      for (const [nick, cur] of tgts) {
-        const prev = prevs.get(nick);
-        // 속도 px/ms — 직전 두 스냅샷 간격 기준
-        let vx = 0;
-        let vy = 0;
-        let vyJump = 0;
-        if (prev) {
-          const dt = cur.t - prev.t;
-          if (dt > 10) {
-            vx = (cur.dx - prev.dx) / dt;
-            vy = (cur.dy - prev.dy) / dt;
-            vyJump = (cur.yJump - prev.yJump) / dt;
-          }
-        }
-        const dtSince = Math.min(now - cur.t, EXTRAP_CAP);
-        const tx = cur.dx + vx * dtSince;
-        const ty = cur.dy + vy * dtSince;
-        const tj = cur.yJump + vyJump * dtSince;
+      for (const [nick, t] of tgts) {
         const c = rends.get(nick) ?? { dx: 0, dy: 0, yJump: 0 };
         const n: PeerMotion = {
-          dx: c.dx + (tx - c.dx) * FACTOR,
-          dy: c.dy + (ty - c.dy) * FACTOR,
-          yJump: c.yJump + (tj - c.yJump) * FACTOR,
+          dx: c.dx + (t.dx - c.dx) * FACTOR,
+          dy: c.dy + (t.dy - c.dy) * FACTOR,
+          yJump: c.yJump + (t.yJump - c.yJump) * FACTOR,
         };
         rends.set(nick, n);
         const el = els.get(nick);
@@ -517,7 +495,7 @@ export function BonfireScene() {
           const flipPart = flips.get(nick) ? 'scaleX(-1)' : '';
           const yOff = -(n.dy + n.yJump);
           el.style.transform = `translate(${n.dx.toFixed(1)}px, ${yOff.toFixed(1)}px) ${flipPart}`;
-          // 모닥불 깊이: silhouettes container bottom 180 + spot.y + dy < 270 이면 불 앞(z25), 아니면 뒤(z8)
+          // 모닥불 깊이: 180 + spot.y + dy < 270 이면 불 앞(z25), 아니면 뒤(z8)
           const spotY = peerSpotYRef.current.get(nick) ?? 0;
           el.style.zIndex = 180 + spotY + n.dy < 270 ? '25' : '8';
         }
@@ -871,6 +849,8 @@ export function BonfireScene() {
     }
     // splash 지속 시간 5초 동안 머리 불 색이 무지개로 붙음.
     splashUntilRef.current = performance.now() + 5000;
+    // 다른 접속자에게도 동일하게 splash 보임 (위치는 각자 화면 중앙).
+    realtimeRef.current?.send('splash', { nick: myNick });
     // roast가 placedAt 기반이라 직접 못 더함 — placedAt을 앞당겨서 시뮬레이션.
     setPile((prev) =>
       prev.map((p) => {
