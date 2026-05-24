@@ -9,6 +9,7 @@ export type MeteorGameState = 'idle' | 'countdown' | 'playing' | 'gameover';
 const BURST_INTERVAL = 50000;
 const BURST_BASE = 54;
 const BURST_MAX_COUNT = 270;
+const BURST_QUIET_MS = 3000;
 export interface Meteor {
   id: number;
   x: number;
@@ -145,6 +146,7 @@ export function useMeteorGame(opts: Options): MeteorGameApi {
       document.visibilityState === 'hidden' ? startAt : null;
     let nextBurstAt = BURST_INTERVAL;
     let burstNum = 0;
+    let quietUntilElapsed = 0;
     const list: Meteor[] = [];
 
     const loop = (now: number) => {
@@ -175,13 +177,16 @@ export function useMeteorGame(opts: Options): MeteorGameApi {
         burstNum += 1;
         const count = Math.min(BURST_BASE * burstNum, BURST_MAX_COUNT);
         dropMeteors(count, nextBurstAt);
+        quietUntilElapsed = nextBurstAt + BURST_QUIET_MS;
         nextBurstAt += BURST_INTERVAL;
       }
 
       // 난이도 곡선 — 점점 빨라짐
       const spawnInterval = Math.max(220, 1100 - elapsed * 0.029);
       const speedBoost = elapsed / 70000;
-      if (now - lastSpawn > spawnInterval) {
+      if (elapsed < quietUntilElapsed) {
+        lastSpawn = now;
+      } else if (now - lastSpawn > spawnInterval) {
         lastSpawn = now;
         const widthFactor = Math.max(1, Math.round(window.innerWidth / 1100));
         for (let k = 0; k < widthFactor; k++) {
