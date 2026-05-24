@@ -1,0 +1,79 @@
+.wrapper {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 50;
+}
+
+.button {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 138, 61, 0.3);
+  background: rgba(11, 11, 16, 0.6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.button:hover {
+  background: rgba(11, 11, 16, 0.78);
+  border-color: rgba(255, 138, 61, 0.55);
+}
+
+.button:focus-visible {
+  outline: 2px solid #ff8a3d;
+  outline-offset: 2px;
+}
+
+.bar {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: #ff8a3d;
+  border-radius: 1px;
+}
+
+.panel {
+  position: absolute;
+  top: 52px;
+  left: 0;
+  min-width: 180px;
+  background: rgba(26, 26, 46, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 138, 61, 0.2);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  padding: 6px;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item {
+  display: block;
+  padding: 10px 14px;
+  border-radius: 6px;
+  color: #e8e4dc;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.item:hover,
+.item:focus-visible {
+  background: rgba(255, 138, 61, 0.12);
+  color: #ff8a3d;
+  outline: none;
+}
