@@ -59,6 +59,9 @@ export function SeoContent() {
         <p>
           한국어 전용 서비스 · 익명 · 회원가입 없음 · 메시지 비저장 · 18초 휘발 · 이스터에그 미니게임
         </p>
+        <p>
+          <a href="/guide">이용가이드 — 불멍에서 노는 법</a>
+        </p>
       </footer>
     </div>
   );
