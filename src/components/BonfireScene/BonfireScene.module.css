@@ -241,7 +241,6 @@
   opacity: 0.7;
   pointer-events: none;
 }
-/* 말풍선 — 작고 차분하게, 닉네임 위로 충분히 띄움 */
 .silhouetteBubble {
   position: absolute;
   bottom: 100%;
@@ -249,38 +248,38 @@
   transform: translateX(-50%);
   margin-bottom: 34px;
   font-family: var(--font-kr);
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 400;
   letter-spacing: -0.005em;
-  line-height: 1.35;
-  color: rgba(244, 237, 224, 0.95);
-  background: rgba(20, 18, 14, 0.78);
+  line-height: 1.5;
+  color: rgba(244, 237, 224, 0.98);
+  background: rgba(11, 11, 16, 0.85);
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 140, 58, 0.16);
-  border-radius: 7px;
-  padding: 5px 10px;
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 200, 150, 0.3);
+  border-radius: 8px;
+  padding: 8px 14px;
   white-space: normal;
   word-break: keep-all;
   overflow-wrap: break-word;
-  max-width: 220px;
+  max-width: 260px;
   text-align: center;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.6);
   pointer-events: none;
   animation: bubbleIn 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-             bubbleOut 0.5s ease-in 2.5s forwards;
+             bubbleOut 0.5s ease-in 5.5s forwards;
   z-index: 14;
 }
-/* 말풍선 꼬리 */
 .silhouetteBubble::after {
   content: '';
   position: absolute;
   left: 50%;
-  bottom: -3px;
-  width: 5px;
-  height: 5px;
-  background: rgba(20, 18, 14, 0.78);
-  border-right: 1px solid rgba(255, 140, 58, 0.16);
-  border-bottom: 1px solid rgba(255, 140, 58, 0.16);
+  bottom: -4px;
+  width: 7px;
+  height: 7px;
+  background: rgba(11, 11, 16, 0.85);
+  border-right: 1px solid rgba(255, 200, 150, 0.3);
+  border-bottom: 1px solid rgba(255, 200, 150, 0.3);
   transform: translateX(-50%) rotate(45deg);
 }
 
@@ -399,7 +398,7 @@
 .inputHint {
   margin-top: 8px;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.1em;
   color: rgba(94, 86, 75, 0.7);
   display: flex;
