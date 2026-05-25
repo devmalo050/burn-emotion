@@ -288,10 +288,10 @@ export function BonfireScene() {
             }
             return prev;
           });
-        }, 3000);
+        }, 6000);
       }
 
-      setFeedMessages((prev) => [msg, ...prev].slice(0, 7));
+      setFeedMessages((prev) => [msg, ...prev].slice(0, 10));
       setTimeout(() => spawnPotatoAtFire(msg), 150 + Math.random() * 250);
       setTimeout(() => {
         setFeedMessages((prev) => prev.map((x) => (x.id === id ? { ...x, fading: true } : x)));
@@ -299,7 +299,7 @@ export function BonfireScene() {
           () => setFeedMessages((prev) => prev.filter((x) => x.id !== id)),
           400,
         );
-      }, 6500);
+      }, 12000);
     },
     [spawnPotatoAtFire],
   );
@@ -943,9 +943,9 @@ export function BonfireScene() {
             }
             return prev;
           });
-        }, 3000);
+        }, 6000);
       }
-      setFeedMessages((prev) => [{ ...msg, nick: msg.nick + ' (나)' }, ...prev].slice(0, 7));
+      setFeedMessages((prev) => [{ ...msg, nick: msg.nick + ' (나)' }, ...prev].slice(0, 10));
       // 다른 접속자들에게 broadcast (WS 연결되어 있을 때만)
       realtimeRef.current?.send('msg', { nick: myNick, text });
       setTimeout(() => spawnPotatoAtFire(msg), 100);
@@ -955,7 +955,7 @@ export function BonfireScene() {
           () => setFeedMessages((prev) => prev.filter((x) => x.id !== id)),
           400,
         );
-      }, 6500);
+      }, 12000);
     },
     [draftMessage, myNick, silhouettes, mySilhouetteIdx, spawnPotatoAtFire],
   );
@@ -1031,6 +1031,7 @@ export function BonfireScene() {
 
       {/* Side feed — quiet whispers heard around the fire */}
       <div className={styles.feed}>
+        <div className={styles.feedHeader}>모닥불 옆 속삭임</div>
         {feedMessages.map((m) => (
           <div
             key={m.id}
