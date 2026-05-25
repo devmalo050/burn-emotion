@@ -695,8 +695,7 @@ export function BonfireScene() {
     inputRef.current?.focus();
   }, []);
 
-  // === Enter / : 입력창에 포커스 없을 때 채팅창으로 점프 (idle 일 때만) ===
-  // 슬래시는 입력값에 그대로 prefix 추가해서 "/별똥별" 같은 슬래시 커맨드 자연스럽게 시작.
+  // === Enter: 입력창에 포커스 없을 때 채팅창으로 점프 (idle 일 때만) ===
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (meteor.gameState !== 'idle' || jump.gameState !== 'idle') return;
@@ -704,13 +703,6 @@ export function BonfireScene() {
       if (e.key === 'Enter') {
         e.preventDefault();
         inputRef.current?.focus();
-        return;
-      }
-      if (e.key === '/') {
-        e.preventDefault();
-        setDraftMessage((prev) => prev + '/');
-        inputRef.current?.focus();
-        return;
       }
     };
     window.addEventListener('keydown', onKey);
@@ -916,16 +908,6 @@ export function BonfireScene() {
       e?.preventDefault?.();
       const text = draftMessage.trim();
       if (!text) return;
-      // === /별똥별 — 게임 트리거 (다른 사람한테 broadcast 안 함, 피드에도 안 띄움) ===
-      if (
-        text === '/별똥별' &&
-        meteor.gameState === 'idle' &&
-        jump.gameState === 'idle'
-      ) {
-        setDraftMessage('');
-        meteor.start();
-        return;
-      }
       // === 도배 방지 — 5초 내 10번 이상만 차단 ===
       const now = Date.now();
       const last = lastSentRef.current;
@@ -975,7 +957,7 @@ export function BonfireScene() {
         );
       }, 6500);
     },
-    [draftMessage, myNick, silhouettes, mySilhouetteIdx, spawnPotatoAtFire, meteor, jump],
+    [draftMessage, myNick, silhouettes, mySilhouetteIdx, spawnPotatoAtFire],
   );
 
   const fireIntensity = Math.min(1.5, 0.85 + pile.length * 0.04);
@@ -1208,15 +1190,15 @@ export function BonfireScene() {
                 : undefined,
             );
           }}
-          ariaLabel="우주를 줄게 시작"
+          ariaLabel="달까지 시작"
         />
       </div>
 
       <div
         onClick={jump.openLeaderboard}
         role="button"
-        aria-label="우주를 줄게 리더보드 열기"
-        title="우주를 줄게 리더보드"
+        aria-label="달까지 리더보드 열기"
+        title="달까지 리더보드"
         className={styles.leaderboardCloud}
         style={{
           position: 'absolute',

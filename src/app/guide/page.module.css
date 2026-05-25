@@ -1,3 +1,10 @@
+:global(html),
+:global(body) {
+  overflow: auto;
+  height: auto;
+  user-select: text;
+}
+
 .page {
   min-height: 100vh;
   background: radial-gradient(at top, #1a1a2e 0%, #0b0b10 80%);

@@ -165,7 +165,7 @@ export function JumpGameOverlay({ api, myNick }: Props) {
       {/* 카운트다운 */}
       {gameState === 'countdown' && (
         <div className={styles.countdown}>
-          <div className={styles.gameTitle}>우주를 줄게</div>
+          <div className={styles.gameTitle}>달까지</div>
           <div key={countdownNum} className={styles.countdownNum}>
             {countdownNum}
           </div>
@@ -206,7 +206,7 @@ export function JumpGameOverlay({ api, myNick }: Props) {
                 </div>
               </>
             ) : (
-              <div className={styles.modalTitle}>우주를 줄게</div>
+              <div className={styles.modalTitle}>달까지</div>
             )}
 
             <div className={styles.top10Label}>TOP 10</div>
