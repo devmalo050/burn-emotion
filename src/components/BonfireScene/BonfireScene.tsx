@@ -1030,7 +1030,10 @@ export function BonfireScene() {
       </div>
 
       {/* Side feed — quiet whispers heard around the fire */}
-      <div className={styles.feed}>
+      <div
+        className={`${styles.feed} ${feedMessages.length === 0 ? styles.feedHidden : ''}`}
+        aria-hidden={feedMessages.length === 0}
+      >
         <div className={styles.feedHeader}>모닥불 옆 속삭임</div>
         {feedMessages.map((m) => (
           <div
