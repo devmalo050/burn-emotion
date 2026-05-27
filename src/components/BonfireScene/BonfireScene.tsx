@@ -291,15 +291,12 @@ export function BonfireScene() {
         }, 6000);
       }
 
-      setFeedMessages((prev) => [msg, ...prev].slice(0, 10));
+      setFeedMessages((prev) => [msg, ...prev].slice(0, 4));
       setTimeout(() => spawnPotatoAtFire(msg), 150 + Math.random() * 250);
-      setTimeout(() => {
-        setFeedMessages((prev) => prev.map((x) => (x.id === id ? { ...x, fading: true } : x)));
-        setTimeout(
-          () => setFeedMessages((prev) => prev.filter((x) => x.id !== id)),
-          400,
-        );
-      }, 12000);
+      setTimeout(
+        () => setFeedMessages((prev) => prev.filter((x) => x.id !== id)),
+        8200,
+      );
     },
     [spawnPotatoAtFire],
   );
@@ -945,17 +942,13 @@ export function BonfireScene() {
           });
         }, 6000);
       }
-      setFeedMessages((prev) => [{ ...msg, nick: msg.nick + ' (나)' }, ...prev].slice(0, 10));
-      // 다른 접속자들에게 broadcast (WS 연결되어 있을 때만)
+      setFeedMessages((prev) => [{ ...msg, nick: msg.nick + ' (나)' }, ...prev].slice(0, 4));
       realtimeRef.current?.send('msg', { nick: myNick, text });
       setTimeout(() => spawnPotatoAtFire(msg), 100);
-      setTimeout(() => {
-        setFeedMessages((prev) => prev.map((x) => (x.id === id ? { ...x, fading: true } : x)));
-        setTimeout(
-          () => setFeedMessages((prev) => prev.filter((x) => x.id !== id)),
-          400,
-        );
-      }, 12000);
+      setTimeout(
+        () => setFeedMessages((prev) => prev.filter((x) => x.id !== id)),
+        8200,
+      );
     },
     [draftMessage, myNick, silhouettes, mySilhouetteIdx, spawnPotatoAtFire],
   );
@@ -1029,19 +1022,12 @@ export function BonfireScene() {
         </div>
       </div>
 
-      {/* Side feed — quiet whispers heard around the fire */}
-      <div
-        className={`${styles.feed} ${feedMessages.length === 0 ? styles.feedHidden : ''}`}
-        aria-hidden={feedMessages.length === 0}
-      >
-        <div className={styles.feedHeader}>모닥불 옆 속삭임</div>
+      {/* 모닥불 옆 연기 — 우측 하단에서 위로 떠오르며 흩어지는 속삭임 */}
+      <div className={styles.feed} aria-hidden={feedMessages.length === 0}>
         {feedMessages.map((m) => (
-          <div
-            key={m.id}
-            className={`${styles.feedItem} ${m.fading ? styles.fading : ''}`}
-          >
-            <div className={styles.feedNick}>{m.nick}</div>
-            <div className={styles.feedText}>{m.text}</div>
+          <div key={m.id} className={styles.feedItem}>
+            <span className={styles.feedNick}>{m.nick}</span>
+            <span className={styles.feedText}>{m.text}</span>
           </div>
         ))}
       </div>
