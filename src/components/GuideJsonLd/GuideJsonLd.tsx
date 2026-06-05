@@ -1,4 +1,4 @@
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://burn-emotion.vercel.app';
+import { SITE_URL } from '@/lib/siteUrl';
 
 const howTo = {
   '@context': 'https://schema.org',

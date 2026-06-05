@@ -1609,6 +1609,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ARG NEXT_PUBLIC_WS_URL
 ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
+ARG NEXT_PUBLIC_SITE_URL
+ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 RUN npm run build
 
 FROM node:22-alpine AS run
@@ -1629,7 +1631,7 @@ Expected: 빌드 성공, `.next/standalone/server.js` 생성.
 
 - [x] **Step 5: 로컬 Docker 빌드 검증**
 
-Run: `docker build --build-arg NEXT_PUBLIC_WS_URL=ws://localhost:8080 -t burn-emotion-web .`
+Run: `docker build --build-arg NEXT_PUBLIC_WS_URL=ws://localhost:8080 --build-arg NEXT_PUBLIC_SITE_URL=https://burn-emotion.net -t burn-emotion-web .`
 Expected: 빌드 성공.
 
 - [x] **Step 6: Commit**

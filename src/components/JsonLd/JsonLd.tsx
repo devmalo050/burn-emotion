@@ -1,8 +1,4 @@
-/**
- * 구조화 데이터(JSON-LD) — 검색엔진과 AI에게 사이트 의미를 정확히 전달.
- * WebApplication + FAQPage 두 schema. 리치 결과 노출 가능성 ↑.
- */
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://burn-emotion.vercel.app';
+import { SITE_URL } from '@/lib/siteUrl';
 
 const webApplication = {
   '@context': 'https://schema.org',

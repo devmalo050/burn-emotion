@@ -1,18 +1,17 @@
 import type { MetadataRoute } from 'next';
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://burn-emotion.vercel.app';
+import { SITE_URL } from '@/lib/siteUrl';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
     {
       url: SITE_URL,
-      lastModified: new Date(),
+      lastModified: '2026-05-27',
       changeFrequency: 'daily',
       priority: 1.0,
     },
     {
       url: `${SITE_URL}/guide`,
-      lastModified: new Date(),
+      lastModified: '2026-05-25',
       changeFrequency: 'monthly',
       priority: 0.8,
     },

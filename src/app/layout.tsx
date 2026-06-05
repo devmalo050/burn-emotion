@@ -1,10 +1,10 @@
 import type { Metadata, Viewport } from 'next';
 import { GoogleAnalytics } from '@next/third-parties/google';
+import { SITE_URL } from '@/lib/siteUrl';
 import './globals.css';
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://burn-emotion.vercel.app';
 const SITE_NAME = '불멍';
 const SITE_DESC =
   '모닥불 옆에서 익명으로 털어놓는 채팅. 욕설 필터 없는 감정 쓰레기통. 작은 이스터에그 미니게임.';
