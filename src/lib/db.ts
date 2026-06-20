@@ -6,9 +6,15 @@ declare global {
   var __pgPool: Pool | undefined;
 }
 
-export const pool: Pool =
-  globalThis.__pgPool ??
-  new Pool({ connectionString: process.env.DATABASE_URL });
+function createPool(): Pool {
+  const p = new Pool({ connectionString: process.env.DATABASE_URL });
+  p.on('error', (err) => {
+    console.error('pg pool idle client error', err);
+  });
+  return p;
+}
+
+export const pool: Pool = globalThis.__pgPool ?? createPool();
 
 if (process.env.NODE_ENV !== 'production') {
   globalThis.__pgPool = pool;

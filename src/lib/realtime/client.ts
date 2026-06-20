@@ -44,6 +44,9 @@ export function connectRealtime(
   let es: EventSource | null = null;
   let flushTimer: ReturnType<typeof setInterval> | null = null;
   let outQueue: OutMsg[] = [];
+  let sseLive = false;
+  let sseRetries = 0;
+  let sseRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
   const emit = (s: RealtimeStatus) => handlers.onStatus?.(s);
 
@@ -63,12 +66,17 @@ export function connectRealtime(
 
   const sendQuery = `?sid=${encodeURIComponent(sessionId)}`;
 
+  const OUT_CAP = 300;
   const enqueue = (msg: OutMsg) => {
     outQueue.push(msg);
+    if (outQueue.length > OUT_CAP) {
+      outQueue = collapseOutbound(outQueue);
+      if (outQueue.length > OUT_CAP) outQueue.splice(0, outQueue.length - OUT_CAP);
+    }
   };
 
   const flush = () => {
-    if (outQueue.length === 0) return;
+    if (!sseLive || outQueue.length === 0) return;
     const items = collapseOutbound(outQueue);
     outQueue = [];
     const body = JSON.stringify(items.length === 1 ? items[0] : { t: 'batch', items });
@@ -80,17 +88,44 @@ export function connectRealtime(
     }).catch(() => {});
   };
 
+  const drainToWs = () => {
+    const sock = ws;
+    if (!sock || sock.readyState !== WebSocket.OPEN || outQueue.length === 0) return;
+    const items = collapseOutbound(outQueue);
+    outQueue = [];
+    for (const it of items) sock.send(JSON.stringify(it));
+  };
+
   const openSse = () => {
     if (closed) return;
     emit('connecting');
     es = new EventSource(`/api/realtime/stream${sendQuery}`);
     es.onopen = () => {
+      sseLive = true;
+      sseRetries = 0;
       emit('open');
       if (lastMeta != null) enqueue({ t: 'track', meta: lastMeta });
     };
     es.onmessage = (ev) => handleInbound(ev.data);
     es.onerror = () => {
-      if (!closed) emit('closed');
+      if (closed) return;
+      sseLive = false;
+      emit('closed');
+      if (es) {
+        es.onopen = es.onmessage = es.onerror = null;
+        try {
+          es.close();
+        } catch {}
+        es = null;
+      }
+      sseRetries += 1;
+      const backoff = Math.min(1000 * 2 ** Math.min(sseRetries, 5), 30000);
+      if (sseRetryTimer) clearTimeout(sseRetryTimer);
+      sseRetryTimer = setTimeout(() => {
+        if (closed || mode !== 'sse') return;
+        if (sseRetries % 4 === 0) retryWsFromSse();
+        else openSse();
+      }, backoff);
     };
     if (!flushTimer) flushTimer = setInterval(flush, FLUSH_MS);
   };
@@ -131,6 +166,7 @@ export function connectRealtime(
       if (lastMeta != null && ws) {
         ws.send(JSON.stringify({ t: 'track', meta: lastMeta }));
       }
+      drainToWs();
     };
     ws.onmessage = (ev) => handleInbound(ev.data);
     ws.onclose = () => {
@@ -153,6 +189,28 @@ export function connectRealtime(
     };
   };
 
+  const retryWsFromSse = () => {
+    if (closed) return;
+    if (es) {
+      es.onopen = es.onmessage = es.onerror = null;
+      try {
+        es.close();
+      } catch {}
+      es = null;
+    }
+    sseLive = false;
+    if (flushTimer) {
+      clearInterval(flushTimer);
+      flushTimer = null;
+    }
+    mode = 'connecting';
+    wsFlaps = 0;
+    fallbackTimer = setTimeout(() => {
+      if (mode === 'connecting') switchToSse();
+    }, FALLBACK_MS);
+    openWs();
+  };
+
   fallbackTimer = setTimeout(() => {
     if (mode === 'connecting') switchToSse();
   }, FALLBACK_MS);
@@ -163,7 +221,7 @@ export function connectRealtime(
       const msg: OutMsg = { t: 'broadcast', event, payload };
       if (mode === 'ws' && ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify(msg));
-      } else if (mode === 'sse') {
+      } else {
         enqueue(msg);
       }
     },
@@ -179,6 +237,7 @@ export function connectRealtime(
       closed = true;
       if (fallbackTimer) clearTimeout(fallbackTimer);
       if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+      if (sseRetryTimer) clearTimeout(sseRetryTimer);
       if (flushTimer) {
         flush();
         clearInterval(flushTimer);

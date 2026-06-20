@@ -8,6 +8,7 @@ const PROXY_SECRET = process.env.REALTIME_PROXY_SECRET || '';
 const HEARTBEAT_MS = 30000;
 const SSE_PING_MS = 25000;
 const MAX_BODY = 1_000_000;
+const MAX_SEND_BUFFER = 1_000_000;
 
 // 단일 룸 릴레이 서버. WS 와 SSE+POST 두 transport 가 같은 방(conns)을 공유한다.
 // presence·broadcast 모두 in-memory, 비영속.
@@ -43,6 +44,14 @@ export function createRealtimeServer({
     conns.delete(conn);
     if (bySession.get(conn.sessionId) === conn) bySession.delete(conn.sessionId);
     broadcastPresence();
+  };
+
+  // 느린/멈춘 클라이언트의 송신 버퍼가 상한을 넘으면 버퍼링 대신 연결을 끊는다.
+  // broadcast 루프 중 removeConn→broadcastPresence 동기 재진입을 피해 마이크로태스크로 지연.
+  const dropConn = (conn) => {
+    if (conn.overloaded) return;
+    conn.overloaded = true;
+    queueMicrotask(() => conn.closeTransport());
   };
 
   const applyMessage = (conn, m) => {
@@ -91,8 +100,10 @@ export function createRealtimeServer({
       isAlive: true,
       transport: 'sse',
       send: (str) => {
+        if (conn.overloaded) return;
         try {
           res.write(`data: ${str}\n\n`);
+          if (res.writableLength > MAX_SEND_BUFFER) dropConn(conn);
         } catch {}
       },
     };
@@ -190,6 +201,11 @@ export function createRealtimeServer({
       transport: 'ws',
       ws,
       send: (str) => {
+        if (conn.overloaded) return;
+        if (ws.bufferedAmount > MAX_SEND_BUFFER) {
+          dropConn(conn);
+          return;
+        }
         if (ws.readyState === ws.OPEN) ws.send(str);
       },
       closeTransport: () => {

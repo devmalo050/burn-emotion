@@ -44,6 +44,7 @@ export interface MeteorGameApi {
   countdownNum: number;
   survivedMs: number;
   meteors: Meteor[];
+  meteorElsRef: RefObject<Map<number, HTMLDivElement | null>>;
   leaderboard: LeaderEntry[];
   lastScoreSec: number | null;
   leaderboardOpen: boolean;
@@ -63,6 +64,9 @@ export function useMeteorGame(opts: Options): MeteorGameApi {
   const [lastScoreSec, setLastScoreSec] = useState<number | null>(null);
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const meteorIdRef = useRef(1);
+  // 매 프레임 위치는 setState 안 거치고 ref 로 DOM transform 직접 갱신 — setMeteors 는
+  // 생성/소멸(membership) 변경 시에만. survivedMs 매 프레임 리렌더에도 메테오 노드는 안 건드림.
+  const meteorElsRef = useRef<Map<number, HTMLDivElement | null>>(new Map());
 
   // === pause 보정 — 탭 hidden 시 시간/시뮬 정지, visible 복귀 시 hidden 동안 흐른 시간을 차감 ===
   const pausedAtRef = useRef<number | null>(null);
@@ -154,6 +158,7 @@ export function useMeteorGame(opts: Options): MeteorGameApi {
       last = now;
       const elapsed = now - startAt - pauseAccumRef.current;
       setSurvivedMs(elapsed);
+      let memberChanged = false;
 
       // burst 헬퍼 — 화면 맨 위에서 별똥별 다발이 쏟아짐. 화면 위 영역에 y 를
       // 흩어 순차적으로 진입하게. 한 번에 많이 떨어지므로 vy 는 천천히.
@@ -170,6 +175,7 @@ export function useMeteorGame(opts: Options): MeteorGameApi {
             vy: 0.22 + Math.random() * 0.18 + speedBoost,
           });
         }
+        if (count > 0) memberChanged = true;
       };
 
       // 50초마다 burst — k 번째는 BURST_BASE * k 개 (상한까지).
@@ -198,6 +204,7 @@ export function useMeteorGame(opts: Options): MeteorGameApi {
             vy: 0.45 + Math.random() * 0.4 + speedBoost,
           });
         }
+        memberChanged = true;
       }
 
       // 이동 + 화면 밖 제거
@@ -206,7 +213,10 @@ export function useMeteorGame(opts: Options): MeteorGameApi {
         const m = list[i];
         m.x += m.vx * dt;
         m.y += m.vy * dt;
-        if (m.y > sh + 60) list.splice(i, 1);
+        if (m.y > sh + 60) {
+          list.splice(i, 1);
+          memberChanged = true;
+        }
       }
 
       // 충돌 판정
@@ -232,7 +242,13 @@ export function useMeteorGame(opts: Options): MeteorGameApi {
         }
       }
 
-      setMeteors([...list]);
+      const els = meteorElsRef.current;
+      for (const m of list) {
+        const el = els.get(m.id);
+        if (el)
+          el.style.transform = `translate(${m.x}px, ${m.y}px) translate(-50%, -50%)`;
+      }
+      if (memberChanged) setMeteors([...list]);
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
@@ -288,6 +304,7 @@ export function useMeteorGame(opts: Options): MeteorGameApi {
     countdownNum,
     survivedMs,
     meteors,
+    meteorElsRef,
     leaderboard,
     lastScoreSec,
     leaderboardOpen,

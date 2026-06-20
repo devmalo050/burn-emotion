@@ -34,8 +34,18 @@
 3. (선택) `REALTIME_PROXY_SECRET` 을 릴레이·Next 양쪽에 동일 설정해 릴레이 SSE/POST 를 프록시 전용으로 잠금.
 4. Cloudflare 는 `text/event-stream` + `no-transform` 을 버퍼링 없이 통과(기본). burn-emotion.net 프록시 설정 그대로 OK.
 
+## 폴백 견고성 (2026-06-20 적대적 리뷰 보강)
+
+초기 구현은 SSE 진입 후 `EventSource.onerror` 가 `emit('closed')` 만 하고 끝나, 릴레이 502/503(재배포·장애) 시 새로고침 전까지 인바운드가 **영구 단절**되는 결함이 있었음. 다음으로 보강:
+
+- **SSE 자가 재연결**: `onerror` 를 종단 실패로 보고 `es.close()` 후 지수 백오프(2→4→…→30s 상한)로 `openSse` 재시도.
+- **WS 부활 경로**: SSE 재시도 4회마다 `openWs` 재시도(회사망 일시 차단 해제 대비). 실패 시 `fallbackTimer` 가 다시 SSE 로 회귀 — `connecting↔ws↔sse` 닫힌 상태머신.
+- **죽은 채널 POST 차단**: `sseLive` 플래그로 SSE 미연결 동안 `flush` POST(409 유발)를 게이트.
+- **send 버퍼링**: WS OPEN 이 아닌 모든 상태(connecting·재연결 대기·sse 미연결)에서 일회성 broadcast(채팅 등)를 `outQueue` 에 보존(상한 300, motion 은 collapse), 연결 확립 시 드레인. 기존엔 이 창에서 채팅이 조용히 유실됐음.
+
 ## 한계
 
 - 릴레이는 **단일 인스턴스** 전제(in-memory 룸, sid→conn). Next 프록시는 stateless 라 Next 는 수평 확장 가능.
 - 폴백 시 모션은 100ms 배칭이라 약간 지연(채팅 우선). presence·채팅은 즉시.
-- 검증: WS 죽은 주소로 강제 폴백, Playwright 로 본인 렌더·양방향 채팅·presence 동기화·send(배칭 POST) 확인. 단위/통합 테스트 전부 통과(vitest 26, 릴레이 10), 프로덕션 빌드 통과.
+- 사내 프록시가 `text/event-stream` 자체를 버퍼링/차단하면 SSE 도 못 뚫음 — 그 경우 HTTP long-polling 으로 한 단계 더 내려가야 함(미구현).
+- 검증: WS 죽은 주소로 강제 폴백, Playwright 로 본인 렌더·양방향 채팅·presence 동기화·send(배칭 POST) 확인. 단위/통합 테스트 전부 통과(vitest 29 — client 상태머신 3종 포함, 릴레이 10), 프로덕션 빌드 통과.

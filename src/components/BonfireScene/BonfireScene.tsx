@@ -126,7 +126,7 @@ export function BonfireScene() {
   const [draftMessage, setDraftMessage] = useState('');
   const [myNick] = useState(() => makeNickname());
   const [silhouettes, setSilhouettes] = useState<SilhouetteEntity[]>([]);
-  const [activeBubbles, setActiveBubbles] = useState<Record<number, ActiveBubble>>({});
+  const [activeBubbles, setActiveBubbles] = useState<Record<string, ActiveBubble>>({});
   const [pile, setPile] = useState<PotatoState[]>([]);
   // 내 자리 인덱스 — 세션 시작 후 첫 silhouettes 생성 시 랜덤 선택해서 고정
   const [mySilhouetteIdx, setMySilhouetteIdx] = useState<number | null>(null);
@@ -279,14 +279,14 @@ export function BonfireScene() {
       const id = messageIdRef.current++;
       const msg: ChatMessage = { id, text, nick, sIdx, time: Date.now(), isMe: false };
 
-      if (sIdx >= 0) {
+      if (nick) {
         const bubbleKey = Date.now() + Math.random();
-        setActiveBubbles((prev) => ({ ...prev, [sIdx]: { text, key: bubbleKey } }));
+        setActiveBubbles((prev) => ({ ...prev, [nick]: { text, key: bubbleKey } }));
         setTimeout(() => {
           setActiveBubbles((prev) => {
-            if (prev[sIdx]?.key === bubbleKey) {
+            if (prev[nick]?.key === bubbleKey) {
               const next = { ...prev };
-              delete next[sIdx];
+              delete next[nick];
               return next;
             }
             return prev;
@@ -386,6 +386,16 @@ export function BonfireScene() {
         const next: typeof prev = {};
         for (const [nick, h] of Object.entries(prev)) {
           if (valid.has(nick)) next[nick] = h;
+          else changed = true;
+        }
+        return changed ? next : prev;
+      });
+      // 떠난 사람의 말풍선도 정리 (유령 버블 방지).
+      setActiveBubbles((prev) => {
+        let changed = false;
+        const next: typeof prev = {};
+        for (const [nick, b] of Object.entries(prev)) {
+          if (valid.has(nick)) next[nick] = b;
           else changed = true;
         }
         return changed ? next : prev;
@@ -514,7 +524,7 @@ export function BonfireScene() {
         yJump: m.yJump,
       });
       lastSentMotionRef.current = { dx: m.dx, dy: m.dy, yJump: m.yJump };
-    }, 16);
+    }, 50);
     return () => clearInterval(id);
   }, [myNick]);
 
@@ -962,12 +972,12 @@ export function BonfireScene() {
       };
       if (sIdx >= 0) {
         const bubbleKey = Date.now() + Math.random();
-        setActiveBubbles((prev) => ({ ...prev, [sIdx]: { text, key: bubbleKey } }));
+        setActiveBubbles((prev) => ({ ...prev, [myNick]: { text, key: bubbleKey } }));
         setTimeout(() => {
           setActiveBubbles((prev) => {
-            if (prev[sIdx]?.key === bubbleKey) {
+            if (prev[myNick]?.key === bubbleKey) {
               const next = { ...prev };
-              delete next[sIdx];
+              delete next[myNick];
               return next;
             }
             return prev;
@@ -1176,15 +1186,15 @@ export function BonfireScene() {
                 )}
                 <PersonSilhouette variant={s.variant} scale={s.scale} />
               </div>
-              {activeBubbles[i] && (
+              {activeBubbles[s.nick] && (
                 <div
                   className={styles.silhouetteBubble}
-                  key={activeBubbles[i].key}
+                  key={activeBubbles[s.nick].key}
                   style={{
                     transform: `translateX(-50%) ${!isMine && s.flip ? 'scaleX(-1)' : ''}`,
                   }}
                 >
-                  {activeBubbles[i].text}
+                  {activeBubbles[s.nick].text}
                 </div>
               )}
             </div>
@@ -1260,7 +1270,10 @@ export function BonfireScene() {
       {/* 모닥불 불꽃 — Claude Design 핸드오프(메탈볼 캔버스 파티클).
           bonfireZone 의 transform 이 fixed containing block 을 가둬서
           좌표가 어긋남. stage 직접 자식으로 두어 viewport 기준 fixed 가 작동하게. */}
-      <CampfireFlames ref={campfireFlamesRef} />
+      <CampfireFlames
+        ref={campfireFlamesRef}
+        paused={meteor.gameState !== 'idle' || jump.gameState !== 'idle'}
+      />
 
       {/* 굽고 있는 고구마 — bonfireZone 에서 빼서 stage 자식으로. z 50 으로 불꽃 위에 보임.
           bonfireZone bottom 220 기준으로 좌표 offset. */}

@@ -1,4 +1,5 @@
 'use client';
+import { useMemo } from 'react';
 import type { MeteorGameApi } from './useMeteorGame';
 
 // 키보드 가이드 일러스트 박스 스타일 (별똥별 카운트다운 화면).
@@ -30,53 +31,66 @@ export function MeteorOverlay({ api, myNick }: Props) {
     countdownNum,
     survivedMs,
     meteors,
+    meteorElsRef,
     leaderboard,
     lastScoreSec,
     leaderboardOpen,
     close,
   } = api;
 
+  // 위치는 RAF 가 ref 로 매 프레임 갱신 — 여기 useMemo 는 membership(meteors 참조) 바뀔 때만
+  // 재생성. survivedMs 매 프레임 리렌더 시엔 동일 참조라 React 가 이 서브트리 reconcile 을 스킵.
+  const meteorField = useMemo(
+    () =>
+      meteors.map((m) => {
+        const angle = Math.atan2(m.vy, m.vx) * (180 / Math.PI);
+        return (
+          <div
+            key={m.id}
+            ref={(el) => {
+              if (el) meteorElsRef.current.set(m.id, el);
+              else meteorElsRef.current.delete(m.id);
+            }}
+            style={{
+              position: 'fixed',
+              left: 0,
+              top: 0,
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: '#fff7d6',
+              boxShadow:
+                '0 0 16px 6px rgba(255,213,144,0.75), 0 0 32px 10px rgba(255,140,58,0.35)',
+              transform: `translate(${m.x}px, ${m.y}px) translate(-50%, -50%)`,
+              pointerEvents: 'none',
+              zIndex: 90,
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                width: 2,
+                height: 56,
+                background:
+                  'linear-gradient(0deg, transparent, rgba(255,213,144,0.8))',
+                top: '50%',
+                left: '50%',
+                transformOrigin: '50% 0%',
+                transform: `translate(-50%, 0) rotate(${angle + 90}deg)`,
+              }}
+            />
+          </div>
+        );
+      }),
+    [meteors, meteorElsRef],
+  );
+
   return (
     <>
       {gameState !== 'idle' && (
         <>
-          {/* 별똥별 */}
-          {meteors.map((m) => {
-            const angle = Math.atan2(m.vy, m.vx) * (180 / Math.PI);
-            return (
-              <div
-                key={m.id}
-                style={{
-                  position: 'fixed',
-                  left: m.x,
-                  top: m.y,
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  background: '#fff7d6',
-                  boxShadow:
-                    '0 0 16px 6px rgba(255,213,144,0.75), 0 0 32px 10px rgba(255,140,58,0.35)',
-                  transform: 'translate(-50%, -50%)',
-                  pointerEvents: 'none',
-                  zIndex: 90,
-                }}
-              >
-                <div
-                  style={{
-                    position: 'absolute',
-                    width: 2,
-                    height: 56,
-                    background:
-                      'linear-gradient(0deg, transparent, rgba(255,213,144,0.8))',
-                    top: '50%',
-                    left: '50%',
-                    transformOrigin: '50% 0%',
-                    transform: `translate(-50%, 0) rotate(${angle + 90}deg)`,
-                  }}
-                />
-              </div>
-            );
-          })}
+          {/* 별똥별 — 위치는 RAF 가 ref 로 직접 갱신 */}
+          {meteorField}
 
           {gameState === 'playing' && (
             <div

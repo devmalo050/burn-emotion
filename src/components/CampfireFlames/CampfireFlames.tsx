@@ -31,6 +31,38 @@ const CORE_PALETTE = ['#fff4c8', '#ffd070', '#ffa030'];
 // 불멍가루 — 실제 컬러플레임 분말이 타는 색조 (구리·칼륨·리튬·나트륨 등)
 const SPLASH_HUES = [120, 145, 175, 200, 220, 260, 285, 320, 50] as const;
 
+// 파티클 그라디언트를 매 프레임 createRadialGradient 로 새로 만들면 초당 수만 개 단명 객체.
+// 색조/팔레트는 이산적이라 단위 반경 스프라이트를 1회 구워두고 drawImage 로 합성 — alpha 변동은
+// globalAlpha 로, ember hue 연속값은 정수로 양자화해 캐시.
+const SPRITE = 128;
+const spriteCache = new Map<string, HTMLCanvasElement>();
+function radialSprite(key: string, stops: () => Array<[number, string]>): HTMLCanvasElement {
+  let s = spriteCache.get(key);
+  if (!s) {
+    s = document.createElement('canvas');
+    s.width = s.height = SPRITE;
+    const g = s.getContext('2d')!;
+    const grad = g.createRadialGradient(SPRITE / 2, SPRITE / 2, 0, SPRITE / 2, SPRITE / 2, SPRITE / 2);
+    for (const [off, col] of stops()) grad.addColorStop(off, col);
+    g.fillStyle = grad;
+    g.fillRect(0, 0, SPRITE, SPRITE);
+    spriteCache.set(key, s);
+  }
+  return s;
+}
+function drawSprite(
+  ctx: CanvasRenderingContext2D,
+  sprite: HTMLCanvasElement,
+  x: number,
+  y: number,
+  r: number,
+  alpha = 1,
+) {
+  if (alpha !== 1) ctx.globalAlpha = alpha;
+  ctx.drawImage(sprite, x - r, y - r, r * 2, r * 2);
+  if (alpha !== 1) ctx.globalAlpha = 1;
+}
+
 interface FlameParticle {
   x: number;
   y: number;
@@ -81,11 +113,20 @@ export interface CampfireFlamesHandle {
   splash: (clientX: number, clientY: number) => void;
 }
 
-export const CampfireFlames = forwardRef<CampfireFlamesHandle>(function CampfireFlames(_props, ref) {
+export interface CampfireFlamesProps {
+  /** 미니게임 등으로 가려질 때 RAF work 정지 (오버레이 뒤 CPU 낭비 방지) */
+  paused?: boolean;
+}
+
+export const CampfireFlames = forwardRef<CampfireFlamesHandle, CampfireFlamesProps>(
+  function CampfireFlames({ paused = false }, ref) {
   const outerCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const coreCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const embersCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const smokeCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
 
   // splash 상태 + powder sparks — RAF 클로저 안에서 mutable.
   const splashStateRef = useRef<{ startedAt: number; duration: number } | null>(null);
@@ -195,6 +236,10 @@ export const CampfireFlames = forwardRef<CampfireFlamesHandle>(function Campfire
     };
 
     const step = () => {
+      if (pausedRef.current) {
+        raf = requestAnimationFrame(step);
+        return;
+      }
       const S = TWEAKS.speed;
       const dragVy = Math.pow(0.992, S);
       const shrinkEarly = Math.pow(0.997, S);
@@ -230,21 +275,23 @@ export const CampfireFlames = forwardRef<CampfireFlamesHandle>(function Campfire
           else col = PALETTE[4];
         }
 
-        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+        let sprite: HTMLCanvasElement;
         if (p.hue != null) {
           // splash — additive 합성 흰색 방지 + 일렁임 안 도드라지게 alpha 적당히.
-          g.addColorStop(0, `hsla(${p.hue},92%,50%,0.55)`);
-          g.addColorStop(0.6, `hsla(${p.hue},92%,42%,0.22)`);
-          g.addColorStop(1, `hsla(${p.hue},92%,38%,0)`);
+          const hue = p.hue;
+          sprite = radialSprite(`os${hue}`, () => [
+            [0, `hsla(${hue},92%,50%,0.55)`],
+            [0.6, `hsla(${hue},92%,42%,0.22)`],
+            [1, `hsla(${hue},92%,38%,0)`],
+          ]);
         } else {
-          g.addColorStop(0, col + 'b0');
-          g.addColorStop(0.6, col + '40');
-          g.addColorStop(1, col + '00');
+          sprite = radialSprite(`op${col}`, () => [
+            [0, col + 'b0'],
+            [0.6, col + '40'],
+            [1, col + '00'],
+          ]);
         }
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fill();
+        drawSprite(ctx, sprite, p.x, p.y, p.r);
       }
       raf = requestAnimationFrame(step);
     };
@@ -298,6 +345,10 @@ export const CampfireFlames = forwardRef<CampfireFlamesHandle>(function Campfire
     };
 
     const step = () => {
+      if (pausedRef.current) {
+        raf = requestAnimationFrame(step);
+        return;
+      }
       const S = TWEAKS.speed;
       const dragVy = Math.pow(0.99, S);
       const shrinkEarly = Math.pow(0.995, S);
@@ -319,24 +370,26 @@ export const CampfireFlames = forwardRef<CampfireFlamesHandle>(function Campfire
           parts.splice(i, 1);
           continue;
         }
-        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+        let sprite: HTMLCanvasElement;
         if (p.hue != null) {
-          g.addColorStop(0, `hsla(${p.hue},90%,60%,0.6)`);
-          g.addColorStop(0.6, `hsla(${p.hue},90%,48%,0.24)`);
-          g.addColorStop(1, `hsla(${p.hue},90%,42%,0)`);
+          const hue = p.hue;
+          sprite = radialSprite(`cs${hue}`, () => [
+            [0, `hsla(${hue},90%,60%,0.6)`],
+            [0.6, `hsla(${hue},90%,48%,0.24)`],
+            [1, `hsla(${hue},90%,42%,0)`],
+          ]);
         } else {
           let col: string;
           if (k < 0.4) col = CORE_PALETTE[0];
           else if (k < 0.75) col = CORE_PALETTE[1];
           else col = CORE_PALETTE[2];
-          g.addColorStop(0, col + 'c0');
-          g.addColorStop(0.6, col + '40');
-          g.addColorStop(1, col + '00');
+          sprite = radialSprite(`cp${col}`, () => [
+            [0, col + 'c0'],
+            [0.6, col + '40'],
+            [1, col + '00'],
+          ]);
         }
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fill();
+        drawSprite(ctx, sprite, p.x, p.y, p.r);
       }
       raf = requestAnimationFrame(step);
     };
@@ -379,6 +432,10 @@ export const CampfireFlames = forwardRef<CampfireFlamesHandle>(function Campfire
     };
 
     const step = () => {
+      if (pausedRef.current) {
+        raf = requestAnimationFrame(step);
+        return;
+      }
       ctx.clearRect(0, 0, c.width, c.height);
       ctx.globalCompositeOperation = 'lighter';
       spawnEmbers();
@@ -396,19 +453,17 @@ export const CampfireFlames = forwardRef<CampfireFlamesHandle>(function Campfire
         }
         const a = (1 - k) * (0.7 + Math.random() * 0.3);
         const r = p.r;
-        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 5);
-        g.addColorStop(0, `hsla(${p.hue},100%,70%,${a * 0.9})`);
-        g.addColorStop(1, `hsla(${p.hue},100%,40%,0)`);
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, r * 5, 0, Math.PI * 2);
-        ctx.fill();
+        const hb = Math.round(p.hue);
+        const glow = radialSprite(`e${hb}`, () => [
+          [0, `hsla(${hb},100%,70%,0.9)`],
+          [1, `hsla(${hb},100%,40%,0)`],
+        ]);
+        drawSprite(ctx, glow, p.x, p.y, r * 5, a);
         ctx.fillStyle = `hsla(${p.hue + 10},100%,85%,${a})`;
         ctx.beginPath();
         ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
         ctx.fill();
       }
-      if (embers.length > TWEAKS.emberCount + 20) embers.length = TWEAKS.emberCount;
 
       // powder sparks (불멍가루) — 불 베이스로 빨려 들어감
       const sparks = powderSparksRef.current;
@@ -432,13 +487,12 @@ export const CampfireFlames = forwardRef<CampfireFlamesHandle>(function Campfire
         // powder sparks alpha — 흰색 안 되는 선에서 적당히
         const a = (1 - k) * 0.72;
         const r = p.r;
-        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 8);
-        g.addColorStop(0, `hsla(${p.hue},100%,58%,${a * 0.7})`);
-        g.addColorStop(1, `hsla(${p.hue},100%,45%,0)`);
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, r * 8, 0, Math.PI * 2);
-        ctx.fill();
+        const hue = p.hue;
+        const glow = radialSprite(`ps${hue}`, () => [
+          [0, `hsla(${hue},100%,58%,0.7)`],
+          [1, `hsla(${hue},100%,45%,0)`],
+        ]);
+        drawSprite(ctx, glow, p.x, p.y, r * 8, a);
         ctx.fillStyle = `hsla(${p.hue},100%,70%,${a * 0.7})`;
         ctx.beginPath();
         ctx.arc(p.x, p.y, r * 1.4, 0, Math.PI * 2);
@@ -474,6 +528,10 @@ export const CampfireFlames = forwardRef<CampfireFlamesHandle>(function Campfire
     window.addEventListener('resize', resize);
 
     const step = () => {
+      if (pausedRef.current) {
+        raf = requestAnimationFrame(step);
+        return;
+      }
       frame++;
       ctx.clearRect(0, 0, c.width, c.height);
       ctx.globalCompositeOperation = 'screen';
@@ -504,13 +562,11 @@ export const CampfireFlames = forwardRef<CampfireFlamesHandle>(function Campfire
         p.y += p.vy;
         p.r += 0.25;
         const a = (1 - k) * 0.1 * TWEAKS.smokeAmount;
-        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
-        g.addColorStop(0, `rgba(200,200,210,${a})`);
-        g.addColorStop(1, 'rgba(200,200,210,0)');
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fill();
+        const smoke = radialSprite('smoke', () => [
+          [0, 'rgba(200,200,210,1)'],
+          [1, 'rgba(200,200,210,0)'],
+        ]);
+        drawSprite(ctx, smoke, p.x, p.y, p.r, a);
       }
       raf = requestAnimationFrame(step);
     };
