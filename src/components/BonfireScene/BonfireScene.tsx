@@ -23,7 +23,9 @@ import {
   connectRealtime,
   isRealtimeConfigured,
   type RealtimeClient,
+  type RealtimeStatus,
 } from '@/lib/realtime/client';
+import { buildMyEntity, mergeSilhouettes } from '@/lib/realtime/presence';
 import { api } from '@/lib/api';
 import type {
   ChatMessage,
@@ -118,6 +120,7 @@ export function BonfireScene() {
   const [showPeople, setShowPeople] = useState(true);
   const [audioStarted, setAudioStarted] = useState(false);
   const [onlineCount, setOnlineCount] = useState(1);
+  const [realtimeBlocked, setRealtimeBlocked] = useState(false);
   const [totalBurned, setTotalBurned] = useState(0);
   const [placeholder, setPlaceholder] = useState<string>(PLACEHOLDER_LINES[0]);
   const [draftMessage, setDraftMessage] = useState('');
@@ -307,6 +310,35 @@ export function BonfireScene() {
   }, [silhouettes]);
 
   useEffect(() => {
+    let lastWidth = window.innerWidth;
+    const onResize = () => {
+      const newWidth = window.innerWidth;
+      if (newWidth === lastWidth) return;
+      const oldWidth = lastWidth;
+      lastWidth = newWidth;
+      const oldCw = Math.min(1100, oldWidth);
+      const newCw = Math.min(1100, newWidth);
+      const oldCL = (oldWidth - oldCw) / 2;
+      const newCL = (newWidth - newCw) / 2;
+      const deltaFor = (sx: number) =>
+        (oldCL - newCL) + (sx / 100) * (oldCw - newCw);
+
+      const spot = mySpotRef.current;
+      if (spot) motionRef.current.dx += deltaFor(spot.x);
+
+      silhouettesRef.current.forEach((s) => {
+        const d = deltaFor(s.x);
+        const pr = peerRenderRef.current.get(s.nick);
+        const pt = peerTargetRef.current.get(s.nick);
+        if (pr) pr.dx += d;
+        if (pt) pt.dx += d;
+      });
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  useEffect(() => {
     if (typeof document === 'undefined' || !document.fonts?.load) return;
     document.fonts.load('800 200px Pretendard').catch(() => {});
     document.fonts.load('700 42px Pretendard').catch(() => {});
@@ -314,42 +346,24 @@ export function BonfireScene() {
     document.fonts.load('400 14px Pretendard').catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (!mySpotRef.current) return;
+    const me = buildMyEntity(mySpotRef.current, myNick);
+    setSilhouettes((prev) => (prev.length ? prev : [me]));
+    setMySilhouetteIdx((prev) => (prev === null ? 0 : prev));
+    if (!isRealtimeConfigured()) setRealtimeBlocked(true);
+  }, [myNick]);
+
   // === 실시간: broadcast (메시지) + presence (접속자/실루엣) ===
-  // presence 가 silhouettes 의 source of truth.
   useEffect(() => {
     if (!isRealtimeConfigured() || !mySpotRef.current) return;
 
-    type PresenceMeta = {
-      nick: string;
-      x: number;
-      y: number;
-      scale: number;
-      flip: boolean;
-      variant: number;
-      joinedAt: number;
-    };
-
     const applyPeers = (state: Record<string, unknown>) => {
-      const peerList: PresenceMeta[] = [];
-      for (const key in state) {
-        const meta = state[key] as PresenceMeta | undefined;
-        if (!meta?.nick) continue;
-        peerList.push(meta);
-      }
-      peerList.sort((a, b) => a.joinedAt - b.joinedAt);
-      const newSilhouettes: SilhouetteEntity[] = peerList.map((p) => ({
-        id: 'peer-' + p.nick,
-        nick: p.nick,
-        x: p.x,
-        y: p.y,
-        scale: p.scale,
-        variant: p.variant,
-        flip: p.flip,
-      }));
+      const me = buildMyEntity(mySpotRef.current!, myNick);
+      const newSilhouettes = mergeSilhouettes(me, state, myNick);
       setSilhouettes(newSilhouettes);
-      setOnlineCount(newSilhouettes.length || 1);
-      const myIdx = newSilhouettes.findIndex((s) => s.nick === myNick);
-      setMySilhouetteIdx(myIdx >= 0 ? myIdx : null);
+      setOnlineCount(newSilhouettes.length);
+      setMySilhouetteIdx(0);
       // peer motion ref 정리 + flip 캐시 갱신 (RAF 가 이걸 읽어 transform 합성)
       const valid = new Set(newSilhouettes.map((s) => s.nick));
       for (const nick of peerTargetRef.current.keys()) {
@@ -376,6 +390,22 @@ export function BonfireScene() {
         }
         return changed ? next : prev;
       });
+    };
+
+    let blockTimer: ReturnType<typeof setTimeout> | null = null;
+    const onStatus = (status: RealtimeStatus) => {
+      if (status === 'open') {
+        if (blockTimer) {
+          clearTimeout(blockTimer);
+          blockTimer = null;
+        }
+        setRealtimeBlocked(false);
+      } else if (!blockTimer) {
+        blockTimer = setTimeout(() => {
+          setRealtimeBlocked(true);
+          blockTimer = null;
+        }, 9000);
+      }
     };
 
     const client = connectRealtime(sessionIdRef.current ?? myNick, {
@@ -434,6 +464,7 @@ export function BonfireScene() {
         }
       },
       onPresence: applyPeers,
+      onStatus,
     });
     if (!client) return;
     realtimeRef.current = client;
@@ -454,6 +485,7 @@ export function BonfireScene() {
     return () => {
       window.removeEventListener('pagehide', onLeave);
       window.removeEventListener('beforeunload', onLeave);
+      if (blockTimer) clearTimeout(blockTimer);
       realtimeRef.current = null;
       client.close();
     };
@@ -1011,8 +1043,10 @@ export function BonfireScene() {
           <div className={styles.metaCard}>
             <span className={styles.metaLabel}>지금 모닥불 옆</span>
             <span className={styles.metaValue}>
-              <span className={styles.liveDot} />
-              {onlineCount}명
+              <span
+                className={`${styles.liveDot} ${realtimeBlocked ? styles.liveDotOff : ''}`}
+              />
+              {realtimeBlocked ? '오프라인' : `${onlineCount}명`}
             </span>
           </div>
           <div className={styles.metaCard}>
@@ -1021,6 +1055,12 @@ export function BonfireScene() {
           </div>
         </div>
       </div>
+
+      {realtimeBlocked && (
+        <div className={styles.offlineBanner} role="status">
+          실시간 연결이 막혀 있어요. 지금은 당신만 보이고, 메시지는 다른 사람에게 전달되지 않아요.
+        </div>
+      )}
 
       {/* 모닥불 옆 연기 — 우측 하단에서 위로 떠오르며 흩어지는 속삭임 */}
       <div className={styles.feed} aria-hidden={feedMessages.length === 0}>
