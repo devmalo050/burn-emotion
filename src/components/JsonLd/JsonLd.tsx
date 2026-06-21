@@ -7,7 +7,7 @@ const webApplication = {
   alternateName: 'Burn Emotion',
   url: SITE_URL,
   description:
-    '모닥불 옆에서 익명으로 털어놓는 한국어 채팅. 욕설 필터 없는 감정 쓰레기통. 채팅창 명령어로 작은 이스터에그 미니게임도 즐길 수 있습니다.',
+    '모닥불 옆에서 익명으로 털어놓는 한국어 채팅. 욕설 필터 없는 감정 쓰레기통. 달·열기구를 클릭해 작은 이스터에그 미니게임도 즐길 수 있습니다.',
   applicationCategory: 'LifestyleApplication',
   operatingSystem: 'Web',
   inLanguage: 'ko-KR',
