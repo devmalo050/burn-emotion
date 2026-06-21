@@ -1,0 +1,51 @@
+.joyBase {
+  position: fixed;
+  width: 112px;
+  height: 112px;
+  margin-left: -56px;
+  margin-top: -56px;
+  border-radius: 50%;
+  background: rgba(239, 232, 217, 0.07);
+  border: 1px solid rgba(239, 232, 217, 0.22);
+  z-index: 93;
+  pointer-events: none;
+  touch-action: none;
+}
+
+.joyKnob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 56px;
+  height: 56px;
+  margin-left: -28px;
+  margin-top: -28px;
+  border-radius: 50%;
+  background: rgba(255, 140, 58, 0.45);
+  border: 1px solid rgba(255, 140, 58, 0.7);
+}
+
+.jumpBtn {
+  position: fixed;
+  left: 28px;
+  bottom: 40px;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: rgba(255, 140, 58, 0.2);
+  border: 1px solid rgba(255, 140, 58, 0.6);
+  color: rgba(239, 232, 217, 0.9);
+  font-size: 22px;
+  line-height: 1;
+  z-index: 93;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.jumpBtn:active {
+  background: rgba(255, 140, 58, 0.4);
+}
