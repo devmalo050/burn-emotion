@@ -375,6 +375,12 @@
   width: min(420px, calc(100vw - 80px));
   z-index: 25;
 }
+
+@media (pointer: coarse) {
+  .inputZone {
+    bottom: 132px;
+  }
+}
 .inputBar {
   display: flex;
   align-items: center;
