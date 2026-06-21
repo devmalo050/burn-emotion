@@ -119,3 +119,10 @@ src/components/TouchControls/
 - `BonfireScene.tsx:798-810` — `joy.active` 분기로 `kx/ky` 대체.
 - `BonfireScene.tsx` 렌더 — `<TouchControls joystickRef={joystickRef} onJump={triggerJump} enabled={isCoarsePointer && jump.gameState === 'idle'} />` 추가.
 - 신규 `src/components/TouchControls/*`.
+
+## 구현 현황 (2026-06-21 완료)
+
+- 구현 플랜: `docs/superpowers/plans/2026-06-21-mobile-touch-controls.md` (전 태스크 완료).
+- 커밋: `touch-vector` 순수 함수+단위테스트 → 컴포넌트 → BonfireScene 통합.
+- 검증: `tsc --noEmit` 0, `vitest run` 37 passed(touch-vector 6 + touch-controls 2 신규), `next build` 성공.
+- 시각검증(Playwright 모바일 컨텍스트 `hasTouch+isMobile`): `pointer:coarse`에서 점프 버튼+조이스틱 베이스 렌더, 오른쪽 드래그 시 노브 `translate(56px,0)`·캐릭터 `0→211px` 이동, 떼면 정지, 점프 버튼 탭 시 `y −101px`. 데스크톱(`coarse:false`)에선 미렌더 확인.
