@@ -32,11 +32,11 @@ export default function TouchControls({
 
     const isInteractive = (t: EventTarget | null) =>
       t instanceof Element &&
-      t.closest('button, input, textarea, a, select, [data-no-joystick]');
+      t.closest('button, input, textarea, a, select, [role="button"], [data-no-joystick]');
 
     const onDown = (e: PointerEvent) => {
       if (pidRef.current !== null) return;
-      if (e.clientX <= window.innerWidth / 2) return;
+      if (e.clientX > window.innerWidth / 2) return;
       if (isInteractive(e.target)) return;
       pidRef.current = e.pointerId;
       originRef.current = { x: e.clientX, y: e.clientY };
@@ -95,7 +95,23 @@ export default function TouchControls({
           onJump();
         }}
       >
-        ▲
+        <svg className={styles.jumpIcon} viewBox="0 0 28 28" fill="none" aria-hidden="true">
+          <path
+            d="M6 16.5 L14 8.5 L22 16.5"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M6 21 L14 13 L22 21"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity="0.5"
+          />
+        </svg>
       </button>
     </>
   );

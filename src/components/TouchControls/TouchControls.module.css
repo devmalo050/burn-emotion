@@ -27,25 +27,69 @@
 
 .jumpBtn {
   position: fixed;
-  left: 28px;
-  bottom: 40px;
-  width: 72px;
-  height: 72px;
+  right: 30px;
+  bottom: 46px;
+  width: 76px;
+  height: 76px;
+  padding: 0;
   border-radius: 50%;
-  background: rgba(255, 140, 58, 0.2);
-  border: 1px solid rgba(255, 140, 58, 0.6);
-  color: rgba(239, 232, 217, 0.9);
-  font-size: 22px;
-  line-height: 1;
+  border: 1px solid rgba(255, 178, 102, 0.5);
+  background: radial-gradient(circle at 50% 35%, #ffca7a 0%, #ff8a3c 42%, #d4541a 100%);
+  color: #fff6ec;
   z-index: 93;
+  cursor: pointer;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow:
+    0 8px 22px rgba(255, 120, 40, 0.3),
+    0 2px 5px rgba(0, 0, 0, 0.35),
+    inset 0 2px 6px rgba(255, 234, 200, 0.6),
+    inset 0 -7px 12px rgba(150, 52, 12, 0.45);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+  animation: jumpEmber 3s ease-in-out infinite;
+}
+
+@keyframes jumpEmber {
+  0%,
+  100% {
+    box-shadow:
+      0 8px 22px rgba(255, 120, 40, 0.3),
+      0 2px 5px rgba(0, 0, 0, 0.35),
+      inset 0 2px 6px rgba(255, 234, 200, 0.6),
+      inset 0 -7px 12px rgba(150, 52, 12, 0.45);
+  }
+  50% {
+    box-shadow:
+      0 10px 30px rgba(255, 146, 60, 0.5),
+      0 2px 5px rgba(0, 0, 0, 0.35),
+      inset 0 2px 7px rgba(255, 240, 210, 0.7),
+      inset 0 -7px 12px rgba(150, 52, 12, 0.45);
+  }
 }
 
 .jumpBtn:active {
-  background: rgba(255, 140, 58, 0.4);
+  transform: scale(0.9) translateY(2px);
+  animation: none;
+  filter: brightness(1.08);
+  box-shadow:
+    0 3px 10px rgba(255, 120, 40, 0.4),
+    inset 0 3px 9px rgba(150, 52, 12, 0.55);
+}
+
+.jumpIcon {
+  width: 30px;
+  height: 30px;
+  margin-top: -2px;
+  filter: drop-shadow(0 1px 1px rgba(110, 36, 0, 0.55));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jumpBtn {
+    animation: none;
+  }
 }

@@ -125,4 +125,10 @@ src/components/TouchControls/
 - 구현 플랜: `docs/superpowers/plans/2026-06-21-mobile-touch-controls.md` (전 태스크 완료).
 - 커밋: `touch-vector` 순수 함수+단위테스트 → 컴포넌트 → BonfireScene 통합.
 - 검증: `tsc --noEmit` 0, `vitest run` 37 passed(touch-vector 6 + touch-controls 2 신규), `next build` 성공.
-- 시각검증(Playwright 모바일 컨텍스트 `hasTouch+isMobile`): `pointer:coarse`에서 점프 버튼+조이스틱 베이스 렌더, 오른쪽 드래그 시 노브 `translate(56px,0)`·캐릭터 `0→211px` 이동, 떼면 정지, 점프 버튼 탭 시 `y −101px`. 데스크톱(`coarse:false`)에선 미렌더 확인.
+- 시각검증(Playwright 모바일 컨텍스트 `hasTouch+isMobile`): `pointer:coarse`에서 점프 버튼+조이스틱 베이스 렌더, 드래그 시 노브 `translate(56px,0)`·캐릭터 이동, 떼면 정지, 점프 버튼 탭 시 `y −101px`. 데스크톱(`coarse:false`)에선 미렌더 확인.
+
+### 배치 조정 (사용자 피드백, 2026-06-21)
+
+- 설계 당시 "오른손=조이스틱 오른쪽"이었으나, 실사용 후 **조이스틱 왼쪽 / 점프 버튼 오른쪽**으로 반전(왼손 이동·오른손 점프, 일반 모바일 게임 컨벤션). 조이스틱 활성 영역은 `clientX <= innerWidth/2`(왼쪽 절반).
+- 왼쪽 영역에 들어온 `role="button"` 요소(달 풍선·리더보드 구름)는 `isInteractive` 셀렉터에 `[role="button"]`을 더해 자동 양보. 모닥불은 기존 `data-no-joystick` 유지.
+- 점프 버튼 리디자인: 모닥불 톤의 따뜻한 radial 그라데이션 + 불씨 글로우(`jumpEmber` pulse, `prefers-reduced-motion` 시 정지) + 위로 향하는 이중 라운드 chevron SVG.
