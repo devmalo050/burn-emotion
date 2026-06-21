@@ -10,6 +10,7 @@ import { MeteorOverlay } from '@/components/MeteorGame/MeteorOverlay';
 import { useJumpGame } from '@/components/JumpGame/useJumpGame';
 import { JumpGameOverlay } from '@/components/JumpGame/JumpGameOverlay';
 import { HotAirBalloon } from '@/components/HotAirBalloon/HotAirBalloon';
+import TouchControls from '@/components/TouchControls/TouchControls';
 import {
   CampfireFlames,
   type CampfireFlamesHandle,
@@ -142,6 +143,11 @@ export function BonfireScene() {
     jumping: false,
     keys: new Set<string>(),
   });
+  const joystickRef = useRef<{ x: number; y: number; active: boolean }>({
+    x: 0,
+    y: 0,
+    active: false,
+  });
   // 다른 접속자들의 motion (broadcast 수신) — RAF 에서 lerp 로 60fps 부드럽게.
   // 외삽은 방향 전환 때 오버슈팅/스냅으로 부자연스러워서 안 씀. RTT 만큼 지연은 감수.
   type PeerMotion = { dx: number; dy: number; yJump: number };
@@ -166,6 +172,7 @@ export function BonfireScene() {
   const inBonfireZoneRef = useRef(false);
   // 머리 위 불꽃 이스터에그 — 캐릭터가 모닥불 통과 시 5초 지속
   const [headFire, setHeadFire] = useState<{ rainbow: boolean } | null>(null);
+  const [coarsePointer, setCoarsePointer] = useState(false);
   const headFireTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // NPC 모닥지기 가이드 버블 (시간 기반 로테이션)
   const [npcBubble, setNpcBubble] = useState<{ text: string; key: number } | null>(null);
@@ -748,6 +755,22 @@ export function BonfireScene() {
     return () => window.removeEventListener('keydown', onKey);
   }, [meteor.gameState, jump.gameState]);
 
+  const triggerJump = useCallback(() => {
+    const m = motionRef.current;
+    if (!m.jumping) {
+      m.vy = 0.95;
+      m.jumping = true;
+    }
+  }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(pointer: coarse)');
+    const update = () => setCoarsePointer(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
   // === EASTER EGG: 방향키 이동 + 스페이스바 점프 ===
   // 본인 화면에서만 (presence 업데이트 안 함). 채팅 입력창 blur 일 때만 키 인식.
   // 대각선은 두 키 동시 입력 시 자동 정규화 (대각선이 더 빠르지 않게).
@@ -773,10 +796,7 @@ export function BonfireScene() {
       }
       e.preventDefault();
       motion.keys.add(k);
-      if (k === ' ' && !motion.jumping) {
-        motion.vy = 0.95;
-        motion.jumping = true;
-      }
+      if (k === ' ') triggerJump();
     };
     const onKeyUp = (e: KeyboardEvent) => {
       motion.keys.delete(e.key);
@@ -797,14 +817,20 @@ export function BonfireScene() {
 
       let kx = 0;
       let ky = 0;
-      if (motion.keys.has('ArrowLeft')) kx -= 1;
-      if (motion.keys.has('ArrowRight')) kx += 1;
-      if (motion.keys.has('ArrowUp')) ky += 1;
-      if (motion.keys.has('ArrowDown')) ky -= 1;
-      if (kx !== 0 && ky !== 0) {
-        const k = Math.SQRT1_2;
-        kx *= k;
-        ky *= k;
+      const joy = joystickRef.current;
+      if (joy.active) {
+        kx = joy.x;
+        ky = joy.y;
+      } else {
+        if (motion.keys.has('ArrowLeft')) kx -= 1;
+        if (motion.keys.has('ArrowRight')) kx += 1;
+        if (motion.keys.has('ArrowUp')) ky += 1;
+        if (motion.keys.has('ArrowDown')) ky -= 1;
+        if (kx !== 0 && ky !== 0) {
+          const k = Math.SQRT1_2;
+          kx *= k;
+          ky *= k;
+        }
       }
       motion.dx += kx * SPEED * dt;
       motion.dy += ky * SPEED * dt;
@@ -908,7 +934,7 @@ export function BonfireScene() {
       window.removeEventListener('blur', onBlur);
       cancelAnimationFrame(raf);
     };
-  }, [jump.gameState]);
+  }, [jump.gameState, triggerJump]);
 
   // === poke fire (easter egg: tap the campfire to roast faster + 불멍가루 splash) ===
   const pokeFire = useCallback((e?: React.MouseEvent<HTMLDivElement>) => {
@@ -1259,6 +1285,7 @@ export function BonfireScene() {
         ref={fireRef}
         className={`${styles.bonfireZone} ${shake ? styles.shake : ''}`}
         onClick={pokeFire}
+        data-no-joystick
       >
         <Campfire width={280} fireIntensity={fireIntensity} />
 
@@ -1378,6 +1405,11 @@ export function BonfireScene() {
           캐릭터/발판은 viewport 기준 그 자리에 유지되고 메인 씬만 아래로 밀려야 함. */}
       <JumpGameOverlay api={jump} myNick={myNick} />
       <MeteorOverlay api={meteor} myNick={myNick} />
+      <TouchControls
+        joystickRef={joystickRef}
+        onJump={triggerJump}
+        enabled={coarsePointer && jump.gameState === 'idle'}
+      />
     </div>
   );
 }
