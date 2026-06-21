@@ -1299,7 +1299,7 @@ export function BonfireScene() {
           좌표가 어긋남. stage 직접 자식으로 두어 viewport 기준 fixed 가 작동하게. */}
       <CampfireFlames
         ref={campfireFlamesRef}
-        paused={meteor.gameState !== 'idle' || jump.gameState !== 'idle'}
+        paused={jump.gameState !== 'idle'}
       />
 
       {/* 굽고 있는 고구마 — bonfireZone 에서 빼서 stage 자식으로. z 50 으로 불꽃 위에 보임.
