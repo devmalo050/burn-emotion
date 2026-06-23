@@ -162,6 +162,98 @@ test('연결이 끊기면 presence 에서 제거된다', async () => {
   await server.close();
 });
 
+test('SSE 가 {t:"leave"} 를 POST 하면 presence 에서 제거된다', async () => {
+  const server = await createRealtimeServer({ port: 0, allowedOrigin: '' });
+  const ws = await connect(server.port);
+  const s = sseClient(server.port, 'sseLeave');
+  await s.waitFor('presence');
+
+  const wsPresence1 = nextMessage(ws, 'presence');
+  await sseSend(server.port, 'sseLeave', {
+    t: 'track',
+    meta: { nick: 'LEAVER', joinedAt: 5 },
+  });
+  const p1 = await wsPresence1;
+  assert.ok(Object.values(p1.state).some((m) => m.nick === 'LEAVER'));
+
+  const wsPresence2 = nextMessage(ws, 'presence');
+  await sseSend(server.port, 'sseLeave', { t: 'leave' });
+  const p2 = await wsPresence2;
+  assert.equal(
+    Object.values(p2.state).some((m) => m.nick === 'LEAVER'),
+    false,
+  );
+
+  ws.close();
+  await s.close();
+  await server.close();
+});
+
+test('활동 없는 SSE 연결은 idle reaper 가 presence 에서 정리한다', async () => {
+  const server = await createRealtimeServer({
+    port: 0,
+    allowedOrigin: '',
+    heartbeatMs: 40,
+    sseIdleMs: 80,
+  });
+  const ws = await connect(server.port);
+  const s = sseClient(server.port, 'sseIdle');
+  await s.waitFor('presence');
+
+  const wsPresence1 = nextMessage(ws, 'presence');
+  await sseSend(server.port, 'sseIdle', {
+    t: 'track',
+    meta: { nick: 'IDLER', joinedAt: 7 },
+  });
+  const p1 = await wsPresence1;
+  assert.ok(Object.values(p1.state).some((m) => m.nick === 'IDLER'));
+
+  // 이후 아무 POST 도 보내지 않으면 sseIdleMs 경과 후 reaper 가 정리한다.
+  const wsPresence2 = nextMessage(ws, 'presence');
+  const p2 = await wsPresence2;
+  assert.equal(
+    Object.values(p2.state).some((m) => m.nick === 'IDLER'),
+    false,
+  );
+
+  ws.close();
+  await s.close();
+  await server.close();
+});
+
+test('keepalive ping 을 보내는 SSE 연결은 reaper 가 정리하지 않는다', async () => {
+  const server = await createRealtimeServer({
+    port: 0,
+    allowedOrigin: '',
+    heartbeatMs: 30,
+    sseIdleMs: 90,
+  });
+  const s = sseClient(server.port, 'sseAlive');
+  await s.waitFor('presence');
+  await sseSend(server.port, 'sseAlive', {
+    t: 'track',
+    meta: { nick: 'ALIVE', joinedAt: 8 },
+  });
+
+  for (let i = 0; i < 6; i++) {
+    await new Promise((r) => setTimeout(r, 30));
+    await sseSend(server.port, 'sseAlive', { t: 'ping' });
+  }
+
+  // 새 WS 접속 시 받는 presence 스냅샷에 ALIVE 가 남아있어야 한다 (reaper 가 안 지움).
+  const probe = new WebSocket(`ws://127.0.0.1:${server.port}/?sid=probe`);
+  const snap = await new Promise((resolve, reject) => {
+    probe.on('message', (raw) => resolve(JSON.parse(raw.toString())));
+    probe.on('error', reject);
+  });
+  assert.equal(snap.t, 'presence');
+  assert.ok(Object.values(snap.state).some((m) => m.nick === 'ALIVE'));
+
+  probe.close();
+  await s.close();
+  await server.close();
+});
+
 test('신규 접속자는 연결 즉시 presence 스냅샷을 받는다', async () => {
   const server = await createRealtimeServer({ port: 0, allowedOrigin: '' });
   const ws = new WebSocket(`ws://127.0.0.1:${server.port}/?sid=x`);

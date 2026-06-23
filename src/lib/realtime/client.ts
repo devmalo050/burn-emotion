@@ -19,7 +19,10 @@ export interface RealtimeClient {
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? '';
 const FALLBACK_MS = 4000;
-const FLUSH_MS = 100;
+// motion 송신 주기(50ms/20Hz)와 정합 — SSE 폴백에서 위치 업데이트가 절반으로 듬성해지는 것 방지.
+const FLUSH_MS = 50;
+// idle 사용자도 주기적 ping 으로 서버 lastSeen 을 갱신 — SSE idle reaper 의 오회수 방지.
+const KEEPALIVE_MS = 20000;
 
 export function isRealtimeConfigured(): boolean {
   return Boolean(WS_URL);
@@ -75,17 +78,42 @@ export function connectRealtime(
     }
   };
 
-  const flush = () => {
-    if (!sseLive || outQueue.length === 0) return;
-    const items = collapseOutbound(outQueue);
-    outQueue = [];
-    const body = JSON.stringify(items.length === 1 ? items[0] : { t: 'batch', items });
+  let lastPostAt = 0;
+  const postSend = (body: string) => {
+    lastPostAt = Date.now();
     void fetch(`/api/realtime/send${sendQuery}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body,
       keepalive: true,
     }).catch(() => {});
+  };
+
+  const flush = () => {
+    if (!sseLive) return;
+    if (outQueue.length === 0) {
+      if (Date.now() - lastPostAt >= KEEPALIVE_MS) postSend(JSON.stringify({ t: 'ping' }));
+      return;
+    }
+    const items = collapseOutbound(outQueue);
+    outQueue = [];
+    postSend(JSON.stringify(items.length === 1 ? items[0] : { t: 'batch', items }));
+  };
+
+  const sendLeave = () => {
+    const body = JSON.stringify({ t: 'leave' });
+    try {
+      if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+        navigator.sendBeacon(`/api/realtime/send${sendQuery}`, body);
+      } else {
+        void fetch(`/api/realtime/send${sendQuery}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body,
+          keepalive: true,
+        }).catch(() => {});
+      }
+    } catch {}
   };
 
   const drainToWs = () => {
@@ -103,6 +131,7 @@ export function connectRealtime(
     es.onopen = () => {
       sseLive = true;
       sseRetries = 0;
+      lastPostAt = Date.now();
       emit('open');
       if (lastMeta != null) enqueue({ t: 'track', meta: lastMeta });
     };
@@ -235,6 +264,8 @@ export function connectRealtime(
     },
     close: () => {
       closed = true;
+      // SSE 폴백은 소켓 close 가 프록시 체인에서 전파 안 될 수 있어, 명시적 leave 로 즉시 정리시킨다.
+      if (mode === 'sse') sendLeave();
       if (fallbackTimer) clearTimeout(fallbackTimer);
       if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
       if (sseRetryTimer) clearTimeout(sseRetryTimer);

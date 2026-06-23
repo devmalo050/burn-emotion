@@ -7,6 +7,9 @@ const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '';
 const PROXY_SECRET = process.env.REALTIME_PROXY_SECRET || '';
 const HEARTBEAT_MS = 30000;
 const SSE_PING_MS = 25000;
+// SSE 는 소켓 close 전파(프록시 체인)에만 의존하면 회사망 등에서 좀비 conn 이 남는다.
+// POST(send/keepalive) 가 갱신하는 lastSeen 으로 reaper 가 회수한다. 클라 keepalive 주기의 배수.
+const SSE_IDLE_MS = 60000;
 const MAX_BODY = 1_000_000;
 const MAX_SEND_BUFFER = 1_000_000;
 
@@ -16,6 +19,8 @@ export function createRealtimeServer({
   port = PORT,
   allowedOrigin = ALLOWED_ORIGIN,
   proxySecret = PROXY_SECRET,
+  heartbeatMs = HEARTBEAT_MS,
+  sseIdleMs = SSE_IDLE_MS,
 } = {}) {
   const conns = new Set();
   const bySession = new Map();
@@ -59,6 +64,10 @@ export function createRealtimeServer({
     if (m.t === 'track') {
       conn.meta = m.meta;
       broadcastPresence();
+    } else if (m.t === 'leave') {
+      conn.closeTransport?.();
+    } else if (m.t === 'ping') {
+      // lastSeen 은 handleSend 에서 이미 갱신됨. 여기선 no-op.
     } else if (m.t === 'broadcast') {
       const out = JSON.stringify({ t: 'broadcast', event: m.event, payload: m.payload });
       for (const peer of conns) {
@@ -99,6 +108,7 @@ export function createRealtimeServer({
       meta: null,
       isAlive: true,
       transport: 'sse',
+      lastSeen: Date.now(),
       send: (str) => {
         if (conn.overloaded) return;
         try {
@@ -151,6 +161,7 @@ export function createRealtimeServer({
           resolve();
           return;
         }
+        conn.lastSeen = Date.now();
         handleRaw(conn, body);
         res.writeHead(204);
         res.end();
@@ -222,19 +233,25 @@ export function createRealtimeServer({
     ws.on('close', () => removeConn(conn));
   });
 
-  // heartbeat — pong 없는 죽은 WS 연결 정리 (Cloudflare 프록시 idle drop 대비).
-  // SSE 연결은 req close 로 끊김을 감지하고 ping 코멘트로 keepalive 한다.
+  // heartbeat — 죽은 연결 정리.
+  // WS: pong 없는 연결을 terminate (Cloudflare 프록시 idle drop 대비).
+  // SSE: req close 가 프록시 체인에서 전파 안 될 수 있으므로(회사망 좀비), POST/keepalive 가
+  //      갱신하는 lastSeen 으로 idle reaper 가 회수한다.
   const heartbeat = setInterval(() => {
+    const now = Date.now();
     for (const conn of conns) {
-      if (conn.transport !== 'ws') continue;
-      if (!conn.isAlive) {
-        conn.ws.terminate();
-        continue;
+      if (conn.transport === 'ws') {
+        if (!conn.isAlive) {
+          conn.ws.terminate();
+          continue;
+        }
+        conn.isAlive = false;
+        conn.ws.ping();
+      } else if (conn.transport === 'sse') {
+        if (now - conn.lastSeen > sseIdleMs) conn.closeTransport();
       }
-      conn.isAlive = false;
-      conn.ws.ping();
     }
-  }, HEARTBEAT_MS);
+  }, heartbeatMs);
 
   return new Promise((resolve) => {
     http.listen(port, () => {

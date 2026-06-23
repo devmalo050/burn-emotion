@@ -27,6 +27,7 @@ import {
   type RealtimeStatus,
 } from '@/lib/realtime/client';
 import { buildMyEntity, mergeSilhouettes } from '@/lib/realtime/presence';
+import { sampleAt, prune, type PeerSnapshot } from '@/lib/realtime/interpolate';
 import { api } from '@/lib/api';
 import type {
   ChatMessage,
@@ -148,11 +149,10 @@ export function BonfireScene() {
     y: 0,
     active: false,
   });
-  // 다른 접속자들의 motion (broadcast 수신) — RAF 에서 lerp 로 60fps 부드럽게.
-  // 외삽은 방향 전환 때 오버슈팅/스냅으로 부자연스러워서 안 씀. RTT 만큼 지연은 감수.
+  // 다른 접속자들의 motion (broadcast 수신) — 수신 시각 스냅샷 버퍼를 RENDER_DELAY 만큼 지연
+  // 재생해 등속 이동을 등속 직선으로 복원(시간기반 보간). 외삽은 방향 전환 오버슈팅 때문에 안 씀.
   type PeerMotion = { dx: number; dy: number; yJump: number };
-  const peerTargetRef = useRef<Map<string, PeerMotion>>(new Map()); // 네트워크 도착값
-  const peerRenderRef = useRef<Map<string, PeerMotion>>(new Map()); // 현재 화면값(lerp)
+  const peerBufRef = useRef<Map<string, PeerSnapshot[]>>(new Map()); // 수신 스냅샷 버퍼
   const peerElsRef = useRef<Map<string, HTMLDivElement>>(new Map()); // silhouette DOM
   const peerFlipRef = useRef<Map<string, boolean>>(new Map()); // flip flag 캐시
   const peerSpotYRef = useRef<Map<string, number>>(new Map()); // spot.y 캐시 (z-index 계산용)
@@ -335,10 +335,8 @@ export function BonfireScene() {
 
       silhouettesRef.current.forEach((s) => {
         const d = deltaFor(s.x);
-        const pr = peerRenderRef.current.get(s.nick);
-        const pt = peerTargetRef.current.get(s.nick);
-        if (pr) pr.dx += d;
-        if (pt) pt.dx += d;
+        const buf = peerBufRef.current.get(s.nick);
+        if (buf) for (const snap of buf) snap.dx += d;
       });
     };
     window.addEventListener('resize', onResize);
@@ -371,13 +369,10 @@ export function BonfireScene() {
       setSilhouettes(newSilhouettes);
       setOnlineCount(newSilhouettes.length);
       setMySilhouetteIdx(0);
-      // peer motion ref 정리 + flip 캐시 갱신 (RAF 가 이걸 읽어 transform 합성)
+      // peer motion 버퍼 정리 + flip 캐시 갱신 (RAF 가 이걸 읽어 transform 합성)
       const valid = new Set(newSilhouettes.map((s) => s.nick));
-      for (const nick of peerTargetRef.current.keys()) {
-        if (!valid.has(nick)) peerTargetRef.current.delete(nick);
-      }
-      for (const nick of peerRenderRef.current.keys()) {
-        if (!valid.has(nick)) peerRenderRef.current.delete(nick);
+      for (const nick of peerBufRef.current.keys()) {
+        if (!valid.has(nick)) peerBufRef.current.delete(nick);
       }
       peerFlipRef.current.clear();
       peerSpotYRef.current.clear();
@@ -449,11 +444,15 @@ export function BonfireScene() {
             yJump: number;
           };
           if (!data?.nick || data.nick === myNick) return;
-          peerTargetRef.current.set(data.nick, {
+          const buf = peerBufRef.current.get(data.nick) ?? [];
+          buf.push({
+            t: performance.now(),
             dx: data.dx,
             dy: data.dy,
             yJump: data.yJump,
           });
+          if (buf.length > 8) buf.shift();
+          peerBufRef.current.set(data.nick, buf);
         } else if (event === 'splash') {
           // 다른 사람의 불멍가루 splash — 위치는 각자 화면 모닥불 중앙에 트리거.
           const data = payload as { nick: string };
@@ -535,25 +534,21 @@ export function BonfireScene() {
     return () => clearInterval(id);
   }, [myNick]);
 
-  // === 다른 사람 motion RAF lerp — 60fps 로 target 으로 빠르게 따라감.
-  // factor 0.5 → 한 프레임에 절반 따라잡음(~2 프레임이면 거의 도달). 끊김 없음.
-  // 외삽은 방향 전환 때 오버슈팅이 부자연스러워 안 씀 — RTT 만큼 지연은 감수. ===
+  // === 다른 사람 motion 시간기반 보간 — 'now - RENDER_DELAY' 시점을 수신 스냅샷 사이
+  // 선형보간해 60fps 로 렌더. 도착 간격(jitter) 과 무관하게 등속 이동이 등속 직선으로 복원됨.
+  // RENDER_DELAY 는 의도적 지연 버퍼(딜레이보다 부드러움 우선). 외삽은 안 씀. ===
   useEffect(() => {
     let raf = 0;
-    const FACTOR = 0.5;
+    const RENDER_DELAY = 100;
     const step = () => {
-      const tgts = peerTargetRef.current;
-      const rends = peerRenderRef.current;
+      const bufs = peerBufRef.current;
       const els = peerElsRef.current;
       const flips = peerFlipRef.current;
-      for (const [nick, t] of tgts) {
-        const c = rends.get(nick) ?? { dx: 0, dy: 0, yJump: 0 };
-        const n: PeerMotion = {
-          dx: c.dx + (t.dx - c.dx) * FACTOR,
-          dy: c.dy + (t.dy - c.dy) * FACTOR,
-          yJump: c.yJump + (t.yJump - c.yJump) * FACTOR,
-        };
-        rends.set(nick, n);
+      const renderTime = performance.now() - RENDER_DELAY;
+      for (const [nick, buf] of bufs) {
+        prune(buf, renderTime);
+        const n = sampleAt(buf, renderTime);
+        if (!n) continue;
         const el = els.get(nick);
         if (el) {
           const flipPart = flips.get(nick) ? 'scaleX(-1)' : '';

@@ -125,4 +125,46 @@ describe('connectRealtime', () => {
     expect(g.fetch).toHaveBeenCalledTimes(1);
     client.close();
   });
+
+  it('SSE 모드에서 close() 시 명시적 leave 를 sendBeacon 으로 보낸다', () => {
+    const beacon = vi.fn((_url: string | URL, _body?: BodyInit | null) => true);
+    vi.stubGlobal('navigator', { sendBeacon: beacon });
+    const client = connectRealtime('sidL', handlers())!;
+    vi.advanceTimersByTime(4000); // → SSE 모드
+    MockEventSource.instances.at(-1)!._open();
+    client.close();
+    expect(beacon).toHaveBeenCalledTimes(1);
+    const [url, body] = beacon.mock.calls[0];
+    expect(String(url)).toContain('/api/realtime/send');
+    expect(JSON.parse(String(body))).toEqual({ t: 'leave' });
+    vi.unstubAllGlobals();
+  });
+
+  it('WS 모드에서 close() 시 leave 를 보내지 않는다', () => {
+    const beacon = vi.fn((_url: string | URL, _body?: BodyInit | null) => true);
+    vi.stubGlobal('navigator', { sendBeacon: beacon });
+    const client = connectRealtime('sidW', handlers())!;
+    MockWebSocket.instances[0]._open();
+    client.close();
+    expect(beacon).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('SSE idle 상태에서 KEEPALIVE 주기마다 ping POST 로 lastSeen 을 갱신한다', () => {
+    const client = connectRealtime('sidK', handlers())!;
+    vi.advanceTimersByTime(4000); // → SSE 모드
+    MockEventSource.instances.at(-1)!._open();
+    (g.fetch as ReturnType<typeof vi.fn>).mockClear();
+    vi.advanceTimersByTime(20000); // 활동 없이 KEEPALIVE_MS 경과
+    const calls = (g.fetch as ReturnType<typeof vi.fn>).mock.calls;
+    const pinged = calls.some((c) => {
+      try {
+        return JSON.parse((c[1] as { body: string }).body).t === 'ping';
+      } catch {
+        return false;
+      }
+    });
+    expect(pinged).toBe(true);
+    client.close();
+  });
 });
