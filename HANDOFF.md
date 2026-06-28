@@ -1,13 +1,16 @@
-# HANDOFF — 이용가이드 정정 + 실시간 presence 3대 버그 수정 (둘 다 운영 반영·검증 완료)
-<!-- 작성: 2026-06-26 -->
+# HANDOFF — 이용가이드 정정 + 실시간 presence 3대 버그 + NPC 대사 정정 (전부 완료·푸시·검증)
+<!-- 작성: 2026-06-26, 갱신: 2026-06-28 (전부 완료 마무리) -->
 
 ## 🔥 핫 스테이트 (여기만 읽어도 재개 가능)
-- **목표**: (1) 이용가이드를 실제 구현과 일치시키기, (2) 실시간 presence/움직임 3대 버그 잡기.
-- **현재 상태**: **둘 다 완료·커밋·푸시·운영 반영·실전 검증까지 끝.** main `03a6554` = `origin/main`, 워킹트리 깨끗(이 핸드오프 커밋 제외). 회사망에서 leave/끊김/보간 셋 다 정상 사용자 확인 받음. 집(정상망)도 OK.
-- **바로 다음 할 일**: (사실상 마무리 상태 — 남은 건 선택적 후속뿐)
-  1. (선택) **NPC 대사 "큼직한 별" 정정** — `mcp__ccd_session__spawn_task` 칩 `task_81ef5406` pending. `BonfireScene.tsx` NPC_MESSAGES(약 53행)의 "달 옆에 큼직한 별" → 실제 landmarkStar 는 12px 로 moon(18px)보다 작음. 인게임 텍스트라 "이용 가이드" 범위 밖이라 칩으로만 띄워둠. 사용자가 칩 클릭하면 별도 세션에서 처리됨.
-  2. (권장) 새 세션 시작 시 `npx vitest run` + `cd realtime-server && node --test` 한 번 돌려 `03a6554` 최종 그린 재확인 — 이번 세션에서 실시간 수정분(interpolate/SSE leave) 테스트 실행 로그는 안 남김(커밋 전 통과 전제, 가이드 수정분만 vitest 37 확인).
+- **목표**: (1) 이용가이드를 실제 구현과 일치시키기, (2) 실시간 presence/움직임 3대 버그 잡기, (3) NPC 대사 1건 정정.
+- **현재 상태**: **셋 다 완료·커밋·푸시·검증 끝. 남은 작업 없음.** main `89d1274` = `origin/main`, 워킹트리 깨끗. (1)(2)는 운영 반영·회사망 실전 검증(leave/끊김/보간) 완료, (3)은 로컬 그린 후 push(Coolify 자동배포).
+- **바로 다음 할 일**: 없음. 이 핸드오프가 가리키던 일은 모두 종료. **새 작업은 `superpowers:brainstorming` → `writing-plans`부터.**
 - **블로커**: 없음.
+
+## 2026-06-28 마무리 세션 (커밋 1개)
+- **커밋 `89d1274`** — `BonfireScene.tsx:54` NPC_MESSAGES "달 옆에 큼직한 별" → "달 옆에 잔잔히 빛나는 작은 별". 실측 확인: `.moon` 18px > `.landmarkStar` 12px(`StarrySky.module.css:20,40`, 모바일도 동일)이라 "큼직한"은 오안내였음. 가이드 4파일 표현("달 옆 작은 별")과 통일. diff 1줄, `tsc --noEmit` exit 0.
+- **최종 그린 재확인**: `npx vitest run` 11파일/50 passed, `realtime-server` `node --test` 13 passed(SSE leave/idle/keepalive 신규 3 포함). 직전 핸드오프가 남기지 못한 실시간 수정분 실행 로그 이번에 확보.
+- **참고(기존·미수정)**: `BonfireScene.tsx:205,220,221` 의 `Math.random()`/`Date.now()` ref 1회 init 은 React Compiler eslint 가 "impure during render"로 4 errors 잡지만, stash 비교상 기존 배포 코드에 그대로 존재·운영 정상이라 범위 밖으로 둠.
 
 ## 변경 사항 (이번 세션) — 커밋 2개
 
@@ -46,14 +49,14 @@
 - **상수값**: `SSE_IDLE_MS=60000`(server.js:12), `KEEPALIVE_MS=20000`(client.ts:25), `FLUSH_MS=50`(client.ts:23), `RENDER_DELAY=100`(BonfireScene.tsx:542).
 
 ## 열린 스레드 / 블로커
-- **NPC 대사 "큼직한 별"** — 칩 `task_81ef5406` pending(인게임 텍스트, 가이드 외).
+- (해소됨) **NPC 대사 "큼직한 별"** — 2026-06-28 `89d1274` 로 정정·push 완료. 칩 `task_81ef5406` 은 앱 재시작으로 id 만료되어 자동 회수 불가(무해, 클릭해도 이미 수정된 상태 발견).
 - (해소됨, 참고) 이전 핸드오프의 "릴레이 재배포 미확인"(#9 backpressure) — 이번 `03a6554` 가 server.js 를 또 바꿨고 회사망 leave 가 동작하므로 릴레이가 재배포됨이 입증됨 → #9 도 함께 운영 반영된 것으로 추정.
 - (드문 케이스, 미구현) 사내 프록시가 `text/event-stream` 자체를 차단하면 SSE 도 못 뚫음 → HTTP long-polling 한 단계 더 필요.
 
 ## 다음 단계 (순서대로)
-1. (선택) NPC "큼직한 별" 칩 처리하거나 무시.
-2. (권장) `npx vitest run` + `cd realtime-server && node --test` 로 03a6554 최종 그린 확인.
-3. 추가 작업 없으면 종료. 새 기능은 brainstorming→writing-plans 워크플로우부터.
+1. ~~NPC "큼직한 별" 칩 처리~~ → 완료(`89d1274`).
+2. ~~`npx vitest run` + `node --test` 최종 그린 확인~~ → 완료(50 + 13 passed).
+3. **이 핸드오프 작업은 전부 종료. 추가 작업 없음.** 새 기능은 `superpowers:brainstorming` → `writing-plans` 워크플로우부터.
 
 ## 핵심 파일 / 위치
 - `src/lib/realtime/interpolate.ts:16` `sampleAt`, `:44` `prune` (보간 순수함수, 테스트 대상).
